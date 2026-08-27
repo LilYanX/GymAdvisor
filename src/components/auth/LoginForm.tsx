@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/icons";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
-type Mode = "login" | "signup" | "reset";
+type Mode = "login" | "reset";
 
 export function LoginForm() {
   const router = useRouter();
@@ -42,7 +42,6 @@ export function LoginForm() {
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
-    const firstName = String(form.get("first_name") ?? "").trim();
     const supabase = createClient();
 
     if (mode === "reset") {
@@ -59,26 +58,6 @@ export function LoginForm() {
       setInfo(
         "Si un compte existe avec cet e-mail, tu recevras un lien pour choisir un nouveau mot de passe.",
       );
-      return;
-    }
-
-    if (mode === "signup") {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { first_name: firstName } },
-      });
-      setPending(false);
-      if (signUpError) {
-        setError(signUpError.message);
-        return;
-      }
-      if (!data.session) {
-        setInfo("Compte créé. Vérifie tes e-mails puis connecte-toi.");
-        setMode("login");
-        return;
-      }
-      await redirectByRole(data.session.user.id);
       return;
     }
 
@@ -100,19 +79,11 @@ export function LoginForm() {
     setInfo(null);
   }
 
-  const title =
-    mode === "login"
-      ? "Connexion"
-      : mode === "signup"
-        ? "Créer mon espace"
-        : "Mot de passe oublié";
-
+  const title = mode === "login" ? "Connexion" : "Mot de passe oublié";
   const subtitle =
     mode === "login"
       ? "Coach ou sportif - même écran, deux espaces."
-      : mode === "signup"
-        ? "Utilise l’e-mail que ton coach a enregistré."
-        : "Saisis ton e-mail. Un lien te permettra de définir un nouveau mot de passe (coach ou sportif).";
+      : "Saisis ton e-mail. Un lien te permettra de définir un nouveau mot de passe.";
 
   return (
     <main className="flex min-h-screen items-center justify-center px-6">
@@ -124,16 +95,6 @@ export function LoginForm() {
         <h1 className="mt-8 text-2xl font-semibold">{title}</h1>
         <p className="mt-2 text-sm text-ga-muted">{subtitle}</p>
         <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
-          {mode === "signup" ? (
-            <label className="text-sm">
-              <span className="mb-1.5 block text-ga-muted">Prénom</span>
-              <input
-                name="first_name"
-                required
-                className="w-full rounded-lg border border-ga-border bg-ga-card px-3 py-2 outline-none focus:border-ga-lime"
-              />
-            </label>
-          ) : null}
           <label className="text-sm">
             <span className="mb-1.5 block text-ga-muted">E-mail</span>
             <input
@@ -144,7 +105,7 @@ export function LoginForm() {
               className="w-full rounded-lg border border-ga-border bg-ga-card px-3 py-2 outline-none focus:border-ga-lime"
             />
           </label>
-          {mode !== "reset" ? (
+          {mode === "login" ? (
             <label className="text-sm">
               <span className="mb-1.5 block text-ga-muted">Mot de passe</span>
               <input
@@ -152,7 +113,7 @@ export function LoginForm() {
                 type="password"
                 required
                 minLength={6}
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                autoComplete="current-password"
                 className="w-full rounded-lg border border-ga-border bg-ga-card px-3 py-2 outline-none focus:border-ga-lime"
               />
             </label>
@@ -173,17 +134,11 @@ export function LoginForm() {
             disabled={pending}
             className="mt-2 rounded-lg bg-ga-lime px-4 py-2.5 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
           >
-            {pending
-              ? "…"
-              : mode === "login"
-                ? "Se connecter"
-                : mode === "signup"
-                  ? "Créer mon compte"
-                  : "Envoyer le lien"}
+            {pending ? "…" : mode === "login" ? "Se connecter" : "Envoyer le lien"}
           </button>
         </form>
-        <div className="mt-6 flex flex-col gap-2 text-sm">
-          {mode === "reset" ? (
+        {mode === "reset" ? (
+          <div className="mt-6 text-sm">
             <button
               type="button"
               onClick={() => switchMode("login")}
@@ -191,18 +146,13 @@ export function LoginForm() {
             >
               Retour à la connexion
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => switchMode(mode === "login" ? "signup" : "login")}
-              className="text-left text-ga-muted hover:text-ga-fg"
-            >
-              {mode === "login"
-                ? "Sportif ? Créer mon espace"
-                : "Déjà un compte ? Se connecter"}
-            </button>
-          )}
-        </div>
+          </div>
+        ) : (
+          <p className="mt-6 text-sm text-ga-muted">
+            Sportif : ton coach crée ton compte et tu reçois une invitation par
+            e-mail.
+          </p>
+        )}
       </div>
     </main>
   );

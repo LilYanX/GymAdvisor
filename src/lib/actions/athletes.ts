@@ -17,6 +17,7 @@ async function provisionAthleteAuthAccount(params: {
   email: string;
   firstName: string;
   lastName: string;
+  supabase: Awaited<ReturnType<typeof createClient>>;
 }): Promise<{ error: string | null }> {
   let admin;
   try {
@@ -69,25 +70,26 @@ async function provisionAthleteAuthAccount(params: {
     }
   }
 
-  const { error: linkError } = await admin
+  // Liaison via la session coach (RLS is_my_athlete) — pas via service_role sur la table.
+  const { error: linkError } = await params.supabase
     .from("athletes")
     .update({ profile_id: userId })
     .eq("id", params.athleteId);
 
   if (linkError) {
-    return {
-      error: `Compte créé, mais liaison impossible : ${linkError.message}`,
-    };
-  }
+    // Le trigger handle_new_user a peut-être déjà lié par e-mail.
+    const { data: linked } = await params.supabase
+      .from("athletes")
+      .select("profile_id")
+      .eq("id", params.athleteId)
+      .maybeSingle();
 
-  await admin
-    .from("profiles")
-    .update({
-      first_name: params.firstName,
-      last_name: params.lastName,
-      email: params.email,
-    })
-    .eq("id", userId);
+    if (linked?.profile_id !== userId) {
+      return {
+        error: `Compte créé, mais liaison impossible : ${linkError.message}`,
+      };
+    }
+  }
 
   return { error: null };
 }
@@ -210,6 +212,7 @@ export async function createAthlete(
     email,
     firstName,
     lastName,
+    supabase,
   });
   if (authResult.error) {
     return {
