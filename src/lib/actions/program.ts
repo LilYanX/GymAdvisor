@@ -236,13 +236,13 @@ export async function addExerciseToSession(
   beforeExerciseId: string | null = null,
 ) {
   const { profile } = await requireCoach();
+  void profile;
   const supabase = await createClient();
 
   const { data: exercise } = await supabase
     .from("exercises")
     .select("id")
     .eq("id", exerciseId)
-    .eq("coach_id", profile.id)
     .maybeSingle();
   if (!exercise) return { error: "Exercice introuvable." };
 

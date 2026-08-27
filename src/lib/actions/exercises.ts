@@ -51,6 +51,9 @@ export async function createExercise(
   });
 
   if (error) {
+    if (error.code === "23505") {
+      return { error: "Un exercice avec ce nom existe déjà dans la bibliothèque." };
+    }
     return { error: error.message };
   }
 
@@ -63,14 +66,13 @@ export async function updateExerciseVideo(
   exerciseId: string,
   videoUrl: string,
 ): Promise<{ error: string | null }> {
-  const { profile } = await requireCoach();
+  await requireCoach();
   const supabase = await createClient();
 
   const { error } = await supabase
     .from("exercises")
     .update({ video_url: videoUrl })
-    .eq("id", exerciseId)
-    .eq("coach_id", profile.id);
+    .eq("id", exerciseId);
 
   if (error) {
     return { error: error.message };
@@ -85,7 +87,7 @@ export async function updateExercise(
   _prev: ExerciseFormState,
   formData: FormData,
 ): Promise<ExerciseFormState> {
-  const { profile } = await requireCoach();
+  await requireCoach();
   const supabase = await createClient();
 
   const exerciseId = String(formData.get("exercise_id") ?? "");
@@ -113,10 +115,14 @@ export async function updateExercise(
       cues,
       vigilance_points: vigilancePoints,
     })
-    .eq("id", exerciseId)
-    .eq("coach_id", profile.id);
+    .eq("id", exerciseId);
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.code === "23505") {
+      return { error: "Un exercice avec ce nom existe déjà dans la bibliothèque." };
+    }
+    return { error: error.message };
+  }
 
   revalidatePath("/bibliotheque");
   revalidatePath("/editeur");
@@ -126,14 +132,13 @@ export async function updateExercise(
 export async function deleteExercise(
   exerciseId: string,
 ): Promise<{ error: string | null }> {
-  const { profile } = await requireCoach();
+  await requireCoach();
   const supabase = await createClient();
 
   const { error } = await supabase
     .from("exercises")
     .delete()
-    .eq("id", exerciseId)
-    .eq("coach_id", profile.id);
+    .eq("id", exerciseId);
 
   if (error) {
     if (error.code === "23503") {

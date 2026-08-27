@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   archiveAthlete,
+  deleteAthlete,
   setPaymentStatus,
   updateAthlete,
   type AthleteFormState,
@@ -146,6 +147,28 @@ export function AthleteDetailView({ data }: { data: AthleteFollowUp }) {
               className="rounded-lg border border-ga-border px-4 py-2 text-sm text-ga-muted hover:text-ga-fg"
             >
               Archiver
+            </button>
+            <button
+              type="button"
+              disabled={payPending}
+              onClick={() => {
+                const confirmed = window.confirm(
+                  `Supprimer définitivement ${athlete.first_name} ${athlete.last_name} ?\nSon compte, ses programmes et ses suivis seront effacés.`,
+                );
+                if (!confirmed) return;
+                startPay(async () => {
+                  const result = await deleteAthlete(athlete.id);
+                  if (result.error) {
+                    setPayError(result.error);
+                    return;
+                  }
+                  router.push("/sportifs");
+                  router.refresh();
+                });
+              }}
+              className="rounded-lg border border-ga-red/40 px-4 py-2 text-sm text-ga-red hover:bg-ga-red/10"
+            >
+              Supprimer
             </button>
           </div>
         </form>

@@ -76,11 +76,7 @@ export async function getEditorData(
   }));
 
   const [{ data: exercises }, { data: weeks }] = await Promise.all([
-    supabase
-      .from("exercises")
-      .select("*")
-      .eq("coach_id", profile.id)
-      .order("name"),
+    supabase.from("exercises").select("*").order("name"),
     supabase
       .from("program_weeks")
       .select("week_number")

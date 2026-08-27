@@ -38,6 +38,9 @@ export function LibraryView({ exercises }: { exercises: Exercise[] }) {
       <div className="min-w-0 flex-1 overflow-y-auto p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <h1 className="text-2xl font-semibold">Bibliothèque d’exercices</h1>
+          <p className="mt-1 text-sm text-ga-muted">
+            Bibliothèque commune à tous les coachs.
+          </p>
           <Link
             href="/bibliotheque/nouveau"
             className="rounded-lg bg-ga-lime px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"

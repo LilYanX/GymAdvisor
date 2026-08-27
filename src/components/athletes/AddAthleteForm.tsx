@@ -55,6 +55,20 @@ export function AddAthleteForm({ redirectTo }: { redirectTo?: string }) {
           className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
         />
       </label>
+      <label className="text-sm md:col-span-2">
+        <span className="mb-1.5 block text-ga-muted">
+          Durée du suivi (nombre de semaines)
+        </span>
+        <input
+          name="total_weeks"
+          type="number"
+          min={1}
+          max={104}
+          defaultValue={12}
+          required
+          className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
+        />
+      </label>
       {state.error ? (
         <p className="text-sm text-ga-red md:col-span-2">{state.error}</p>
       ) : null}

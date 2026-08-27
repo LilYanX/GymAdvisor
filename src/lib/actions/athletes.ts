@@ -123,6 +123,11 @@ export async function createAthlete(
   const lastName = String(formData.get("last_name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const goal = String(formData.get("goal") ?? "").trim();
+  const totalWeeksRaw = Number(formData.get("total_weeks") ?? 12);
+  const totalWeeks =
+    Number.isFinite(totalWeeksRaw) && totalWeeksRaw >= 1
+      ? Math.min(Math.floor(totalWeeksRaw), 104)
+      : 12;
 
   if (!firstName || !email) {
     return { error: "Le prénom et l’e-mail sont obligatoires." };
@@ -142,6 +147,7 @@ export async function createAthlete(
     p_last_name: lastName,
     p_email: email,
     p_goal: goal,
+    p_total_weeks: totalWeeks,
   });
 
   if (rpc.error) {
@@ -164,6 +170,8 @@ export async function createAthlete(
         last_name: lastName,
         email,
         goal,
+        total_weeks: totalWeeks,
+        current_week: 1,
       })
       .select("id")
       .single();
@@ -175,7 +183,7 @@ export async function createAthlete(
       if (insertError.code === "42501") {
         return {
           error:
-            "Création bloquée par Supabase. Exécute la migration supabase/migrations/20260814213000_coach_create_athlete.sql dans le SQL Editor.",
+            "Création bloquée par Supabase. Exécute les migrations SQL dans le SQL Editor.",
         };
       }
       return { error: insertError.message };
@@ -184,6 +192,13 @@ export async function createAthlete(
     athleteId = athlete?.id ?? null;
   } else {
     athleteId = rpc.data;
+    if (athleteId) {
+      await supabase
+        .from("athletes")
+        .update({ total_weeks: totalWeeks, current_week: 1 })
+        .eq("id", athleteId)
+        .eq("coach_id", user.id);
+    }
   }
 
   if (!athleteId) {
@@ -285,6 +300,47 @@ export async function archiveAthlete(
 
   revalidatePath("/");
   revalidatePath("/sportifs");
+  return { error: null };
+}
+
+export async function deleteAthlete(
+  athleteId: string,
+): Promise<{ error: string | null }> {
+  const { profile } = await requireCoach();
+  const supabase = await createClient();
+
+  const { data: athlete } = await supabase
+    .from("athletes")
+    .select("id, profile_id")
+    .eq("id", athleteId)
+    .eq("coach_id", profile.id)
+    .maybeSingle();
+
+  if (!athlete) return { error: "Sportif introuvable." };
+
+  const profileId = athlete.profile_id;
+
+  const { error } = await supabase
+    .from("athletes")
+    .delete()
+    .eq("id", athleteId)
+    .eq("coach_id", profile.id);
+
+  if (error) return { error: error.message };
+
+  if (profileId) {
+    try {
+      const admin = createAdminClient();
+      await admin.auth.admin.deleteUser(profileId);
+    } catch {
+      // Roster déjà supprimé ; le compte Auth peut rester si la clé service manque.
+    }
+  }
+
+  revalidatePath("/");
+  revalidatePath("/sportifs");
+  revalidatePath("/editeur");
+  revalidatePath("/paiements");
   return { error: null };
 }
 

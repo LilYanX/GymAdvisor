@@ -108,7 +108,7 @@ export type Database = {
       exercises: {
         Row: {
           id: string;
-          coach_id: string;
+          coach_id: string | null;
           name: string;
           muscle_group: Database["public"]["Enums"]["muscle_group"];
           video_url: string | null;
@@ -119,7 +119,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          coach_id: string;
+          coach_id?: string | null;
           name: string;
           muscle_group: Database["public"]["Enums"]["muscle_group"];
           video_url?: string | null;
@@ -130,7 +130,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          coach_id?: string;
+          coach_id?: string | null;
           name?: string;
           muscle_group?: Database["public"]["Enums"]["muscle_group"];
           video_url?: string | null;
@@ -588,6 +588,7 @@ export type Database = {
           p_first_name: string;
           p_goal?: string;
           p_last_name: string;
+          p_total_weeks?: number;
         };
         Returns: string;
       };

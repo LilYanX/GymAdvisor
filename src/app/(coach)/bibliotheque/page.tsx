@@ -3,12 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { LibraryView } from "@/components/library/LibraryView";
 
 export default async function LibraryPage() {
-  const { profile } = await requireCoach();
+  await requireCoach();
   const supabase = await createClient();
   const { data: exercises } = await supabase
     .from("exercises")
     .select("*")
-    .eq("coach_id", profile.id)
     .order("name");
 
   return (
