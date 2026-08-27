@@ -4,8 +4,6 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { MUSCLE_GROUP_LABELS } from "@/lib/labels";
 import type { Exercise, MuscleGroup } from "@/lib/supabase/models";
-import { ExerciseVideoUpload } from "@/components/library/ExerciseVideoUpload";
-import { EditExerciseForm } from "@/components/library/EditExerciseForm";
 import { ExerciseMedia } from "@/components/media/ExerciseMedia";
 
 const FILTERS: Array<{ id: "all" | MuscleGroup; label: string }> = [
@@ -18,17 +16,19 @@ const FILTERS: Array<{ id: "all" | MuscleGroup; label: string }> = [
 
 export function LibraryView({ exercises }: { exercises: Exercise[] }) {
   const [filter, setFilter] = useState<"all" | MuscleGroup>("all");
+  const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(
     exercises[0]?.id ?? null,
   );
 
-  const visible = useMemo(
-    () =>
-      exercises.filter(
-        (exercise) => filter === "all" || exercise.muscle_group === filter,
-      ),
-    [exercises, filter],
-  );
+  const visible = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return exercises.filter((exercise) => {
+      if (filter !== "all" && exercise.muscle_group !== filter) return false;
+      if (!needle) return true;
+      return exercise.name.toLowerCase().includes(needle);
+    });
+  }, [exercises, filter, query]);
 
   const selected =
     visible.find((exercise) => exercise.id === selectedId) ?? visible[0] ?? null;
@@ -38,9 +38,6 @@ export function LibraryView({ exercises }: { exercises: Exercise[] }) {
       <div className="min-w-0 flex-1 overflow-y-auto p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <h1 className="text-2xl font-semibold">Bibliothèque d’exercices</h1>
-          <p className="mt-1 text-sm text-ga-muted">
-            Bibliothèque commune à tous les coachs.
-          </p>
           <Link
             href="/bibliotheque/nouveau"
             className="rounded-lg bg-ga-lime px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
@@ -49,7 +46,14 @@ export function LibraryView({ exercises }: { exercises: Exercise[] }) {
           </Link>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-2">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Rechercher un exercice"
+          className="mt-6 w-full max-w-md rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 text-sm outline-none focus:border-ga-lime"
+        />
+
+        <div className="mt-4 flex flex-wrap gap-2">
           {FILTERS.map((item) => (
             <button
               key={item.id}
@@ -68,7 +72,9 @@ export function LibraryView({ exercises }: { exercises: Exercise[] }) {
 
         {visible.length === 0 ? (
           <p className="mt-8 text-sm text-ga-muted">
-            Aucun exercice. Ajoute le premier avec « Nouvel exercice ».
+            {query.trim()
+              ? "Aucun exercice trouvé."
+              : "Aucun exercice. Ajoute le premier avec « Nouvel exercice »."}
           </p>
         ) : (
           <div className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-3">
@@ -119,10 +125,6 @@ export function LibraryView({ exercises }: { exercises: Exercise[] }) {
                 playing
               />
             </div>
-            <ExerciseVideoUpload
-              exerciseId={selected.id}
-              currentUrl={selected.video_url}
-            />
             {selected.cues.length > 0 ? (
               <div className="mt-5">
                 <h3 className="text-sm font-medium">Consigne</h3>
@@ -141,9 +143,14 @@ export function LibraryView({ exercises }: { exercises: Exercise[] }) {
                 </p>
               </div>
             ) : null}
-            <EditExerciseForm exercise={selected} />
           </div>
-          <div className="shrink-0 border-t border-ga-border p-5">
+          <div className="flex shrink-0 flex-col gap-2 border-t border-ga-border p-5">
+            <Link
+              href={`/bibliotheque/${selected.id}`}
+              className="flex w-full items-center justify-center rounded-lg border border-ga-border px-4 py-2.5 text-sm font-medium hover:border-ga-lime hover:text-ga-fg"
+            >
+              Modifier
+            </Link>
             <Link
               href="/editeur"
               className="flex w-full items-center justify-center rounded-lg bg-ga-lime px-4 py-2.5 text-sm font-semibold text-black hover:bg-lime-300"

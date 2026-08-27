@@ -65,9 +65,6 @@ export function UpdatePasswordForm() {
           <ThemeToggle />
         </div>
         <h1 className="mt-8 text-2xl font-semibold">Nouveau mot de passe</h1>
-        <p className="mt-2 text-sm text-ga-muted">
-          Choisis un mot de passe pour ton compte coach ou sportif.
-        </p>
         <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
           <label className="text-sm">
             <span className="mb-1.5 block text-ga-muted">Nouveau mot de passe</span>

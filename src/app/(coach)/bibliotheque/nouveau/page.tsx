@@ -14,9 +14,6 @@ export default async function NewExercisePage() {
         ← Bibliothèque
       </Link>
       <h1 className="mt-4 text-2xl font-semibold">Nouvel exercice</h1>
-      <p className="mt-1 text-sm text-ga-muted">
-        Ajoute un mouvement avec consignes et, si tu veux, une vidéo MP4.
-      </p>
       <div className="mt-6">
         <ExerciseForm />
       </div>

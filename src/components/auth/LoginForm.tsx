@@ -80,10 +80,6 @@ export function LoginForm() {
   }
 
   const title = mode === "login" ? "Connexion" : "Mot de passe oublié";
-  const subtitle =
-    mode === "login"
-      ? "Coach ou sportif - même écran, deux espaces."
-      : "Saisis ton e-mail. Un lien te permettra de définir un nouveau mot de passe.";
 
   return (
     <main className="flex min-h-screen items-center justify-center px-6">
@@ -93,7 +89,6 @@ export function LoginForm() {
           <ThemeToggle />
         </div>
         <h1 className="mt-8 text-2xl font-semibold">{title}</h1>
-        <p className="mt-2 text-sm text-ga-muted">{subtitle}</p>
         <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
           <label className="text-sm">
             <span className="mb-1.5 block text-ga-muted">E-mail</span>
@@ -147,12 +142,7 @@ export function LoginForm() {
               Retour à la connexion
             </button>
           </div>
-        ) : (
-          <p className="mt-6 text-sm text-ga-muted">
-            Sportif : ton coach crée ton compte et tu reçois une invitation par
-            e-mail.
-          </p>
-        )}
+        ) : null}
       </div>
     </main>
   );

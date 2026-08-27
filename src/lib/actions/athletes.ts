@@ -216,7 +216,7 @@ export async function createAthlete(
   });
   if (authResult.error) {
     return {
-      error: `${authResult.error} (Le sportif a été créé dans le roster : tu peux réessayer ou vérifier la clé SUPABASE_SERVICE_ROLE_KEY.)`,
+      error: authResult.error,
     };
   }
 

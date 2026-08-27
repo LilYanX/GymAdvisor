@@ -21,10 +21,6 @@ export default async function NouveauSportifPage({ searchParams }: Props) {
         </Link>
         <div>
           <h1 className="text-2xl font-semibold">Ajouter un sportif</h1>
-          <p className="mt-1 text-sm text-ga-muted">
-            Un compte est créé automatiquement : le sportif reçoit un e-mail
-            d&apos;invitation pour définir son mot de passe.
-          </p>
         </div>
         <AddAthleteForm redirectTo={redirectTo} />
       </div>

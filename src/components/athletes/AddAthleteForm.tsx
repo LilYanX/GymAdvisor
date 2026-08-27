@@ -20,9 +20,6 @@ export function AddAthleteForm({ redirectTo }: { redirectTo?: string }) {
         <input type="hidden" name="redirect_to" value={redirectTo} />
       ) : null}
       <h2 className="text-base font-semibold md:col-span-2">Ajouter un sportif</h2>
-      <p className="text-sm text-ga-muted md:col-span-2">
-        Un e-mail d’invitation sera envoyé pour activer le compte.
-      </p>
       <label className="text-sm">
         <span className="mb-1.5 block text-ga-muted">Prénom</span>
         <input
@@ -56,9 +53,7 @@ export function AddAthleteForm({ redirectTo }: { redirectTo?: string }) {
         />
       </label>
       <label className="text-sm md:col-span-2">
-        <span className="mb-1.5 block text-ga-muted">
-          Durée du suivi (nombre de semaines)
-        </span>
+        <span className="mb-1.5 block text-ga-muted">Semaines</span>
         <input
           name="total_weeks"
           type="number"

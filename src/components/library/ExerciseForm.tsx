@@ -31,7 +31,7 @@ export function ExerciseForm() {
       formData.set("video_url", result.url);
     }
     formData.delete("video_file");
-    formAction(formData);
+    await formAction(formData);
   }
 
   const busy = pending || uploading;

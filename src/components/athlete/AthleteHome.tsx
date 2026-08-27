@@ -22,8 +22,7 @@ export function AthleteHome({ data }: { data: AthleteProgram }) {
 
       {data.programJustPublished ? (
         <section className="mt-4 rounded-xl border border-ga-lime/40 bg-ga-lime/10 p-4 text-sm">
-          {data.coachFirstName} a publié la suite de ton programme. Regarde ta
-          semaine !
+          Nouveau programme publié.
         </section>
       ) : null}
 

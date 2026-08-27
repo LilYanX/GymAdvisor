@@ -22,9 +22,6 @@ export default async function EditorPage({ searchParams }: Props) {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-semibold">Éditeur de programme</h1>
-              <p className="mt-1 text-sm text-ga-muted">
-                Choisis un sportif pour éditer son programme hebdomadaire.
-              </p>
             </div>
             <Link
               href="/sportifs/nouveau?redirect=/editeur"
@@ -62,13 +59,14 @@ function AthleteBar({
 }) {
   if (athletes.length === 0) {
     return (
-      <p className="border-b border-ga-border px-6 py-3 text-sm text-ga-muted">
-        Ajoute d’abord un sportif dans{" "}
-        <Link href="/sportifs/nouveau?redirect=/editeur" className="text-ga-lime hover:underline">
-          Sportifs
+      <div className="border-b border-ga-border px-6 py-3">
+        <Link
+          href="/sportifs/nouveau?redirect=/editeur"
+          className="text-sm text-ga-lime hover:underline"
+        >
+          Ajouter un sportif
         </Link>
-        .
-      </p>
+      </div>
     );
   }
 

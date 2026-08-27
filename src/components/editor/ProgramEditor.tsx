@@ -529,7 +529,7 @@ export function ProgramEditor({ data }: { data: EditorData }) {
               ) : week.status === "draft" ? (
                 `Brouillon - dernière sauvegarde ${new Date(week.updated_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`
               ) : (
-                "Semaine publiée - le sportif la voit dans son espace"
+                "Publiée"
               )}
               {pending ? " · Enregistrement…" : ""}
             </p>
@@ -539,7 +539,7 @@ export function ProgramEditor({ data }: { data: EditorData }) {
               onClick={() => run(() => publishWeek(week.id))}
               className="rounded-lg bg-ga-lime px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
             >
-              Publier la semaine - {data.athlete.first_name} sera notifié
+              Publier la semaine
             </button>
           </div>
         </footer>

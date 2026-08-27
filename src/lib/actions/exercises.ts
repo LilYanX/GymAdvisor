@@ -79,6 +79,7 @@ export async function updateExerciseVideo(
   }
 
   revalidatePath("/bibliotheque");
+  revalidatePath(`/bibliotheque/${exerciseId}`);
   revalidatePath("/editeur");
   return { error: null };
 }
@@ -125,8 +126,9 @@ export async function updateExercise(
   }
 
   revalidatePath("/bibliotheque");
+  revalidatePath(`/bibliotheque/${exerciseId}`);
   revalidatePath("/editeur");
-  return { error: null };
+  redirect("/bibliotheque");
 }
 
 export async function deleteExercise(
