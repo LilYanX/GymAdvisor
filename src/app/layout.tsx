@@ -1,0 +1,32 @@
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import { Inter } from "next/font/google";
+import { themeInitScript } from "@/lib/theme";
+import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+});
+
+export const metadata: Metadata = {
+  title: "GymAdvisor",
+  description: "Suivi de coachings sportifs à distance",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: ReactNode;
+}>) {
+  return (
+    <html lang="fr" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className={`${inter.className} min-h-screen bg-ga-bg text-ga-fg antialiased`}>
+        {children}
+      </body>
+    </html>
+  );
+}

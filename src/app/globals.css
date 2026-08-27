@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+:root {
+  --ga-bg: #0b0b0c;
+  --ga-panel: #121214;
+  --ga-card: #17171a;
+  --ga-elevated: #1c1c20;
+  --ga-border: #2a2a30;
+  --ga-muted: #8a8a93;
+  --ga-fg: #f4f4f5;
+  --ga-lime: #c8f135;
+  --ga-amber: #f5a524;
+  --ga-blue: #6ea8ff;
+  --ga-red: #ff6b6b;
+  --ga-table-head: #25252b;
+  --ga-table-row-alt: #1a1a1f;
+}
+
+html.light {
+  --ga-bg: #f3f4f6;
+  --ga-panel: #ffffff;
+  --ga-card: #ffffff;
+  --ga-elevated: #eef0f3;
+  --ga-border: #d8dce3;
+  --ga-muted: #6b7280;
+  --ga-fg: #121214;
+  --ga-lime: #8bbf00;
+  --ga-amber: #c47a0a;
+  --ga-blue: #3b82f6;
+  --ga-red: #dc2626;
+  --ga-table-head: #dfe3ea;
+  --ga-table-row-alt: #f0f2f5;
+}
+
+@theme inline {
+  --color-ga-bg: var(--ga-bg);
+  --color-ga-panel: var(--ga-panel);
+  --color-ga-card: var(--ga-card);
+  --color-ga-elevated: var(--ga-elevated);
+  --color-ga-border: var(--ga-border);
+  --color-ga-muted: var(--ga-muted);
+  --color-ga-fg: var(--ga-fg);
+  --color-ga-lime: var(--ga-lime);
+  --color-ga-amber: var(--ga-amber);
+  --color-ga-blue: var(--ga-blue);
+  --color-ga-red: var(--ga-red);
+  --color-ga-table-head: var(--ga-table-head);
+  --color-ga-table-row-alt: var(--ga-table-row-alt);
+}
+
+html,
+body {
+  background: var(--ga-bg);
+  color: var(--ga-fg);
+}
+
+input,
+textarea,
+button {
+  font: inherit;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.ga-table thead {
+  background: var(--ga-table-head);
+  color: var(--ga-fg);
+}
+
+.ga-table thead th {
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ga-table tbody tr:nth-child(even) {
+  background: var(--ga-table-row-alt);
+}
+
+.ga-table tbody tr:hover {
+  background: var(--ga-elevated);
+}
+
+.ga-table-row-clickable {
+  cursor: pointer;
+}
+
+.ga-table-row-clickable:focus-visible {
+  outline: 2px solid var(--ga-lime);
+  outline-offset: -2px;
+}
+
+.ga-scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ga-scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+.ga-scroll-hover {
+  overflow-y: hidden;
+}
+
+.ga-scroll-hover:hover {
+  overflow-y: auto;
+}
