@@ -6,6 +6,17 @@ import { hasEnvVars } from "./env";
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
+  // Lien Auth parfois reçu sur "/" (Site URL) au lieu de /auth/callback
+  const authCode = request.nextUrl.searchParams.get("code");
+  if (authCode && !request.nextUrl.pathname.startsWith("/auth/")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    if (!url.searchParams.get("next")) {
+      url.searchParams.set("next", "/login/nouveau-mot-de-passe");
+    }
+    return NextResponse.redirect(url);
+  }
+
   if (!hasEnvVars) {
     return supabaseResponse;
   }

@@ -4,12 +4,113 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireCoach } from "@/lib/auth";
 import { firstOfMonthISO } from "@/lib/dates";
+import { createAdminClient, getAppUrl } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { PaymentStatus } from "@/lib/supabase/models";
 
 export type AthleteFormState = {
   error: string | null;
 };
+
+async function provisionAthleteAuthAccount(params: {
+  athleteId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}): Promise<{ error: string | null }> {
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Clé service role Supabase manquante.",
+    };
+  }
+
+  const appUrl = await getAppUrl();
+  const redirectTo = `${appUrl}/auth/callback?next=/login/nouveau-mot-de-passe`;
+
+  const invite = await admin.auth.admin.inviteUserByEmail(params.email, {
+    data: {
+      first_name: params.firstName,
+      last_name: params.lastName,
+    },
+    redirectTo,
+  });
+
+  let userId = invite.data.user?.id ?? null;
+
+  if (invite.error || !userId) {
+    const message = invite.error?.message?.toLowerCase() ?? "";
+    const alreadyExists =
+      message.includes("already") ||
+      message.includes("registered") ||
+      message.includes("exists") ||
+      invite.error?.status === 422;
+
+    if (!alreadyExists) {
+      return {
+        error:
+          invite.error?.message ??
+          "Impossible de créer le compte de connexion du sportif.",
+      };
+    }
+
+    const existingId = await findAuthUserIdByEmail(admin, params.email);
+    userId = existingId;
+    if (!userId) {
+      return {
+        error:
+          "Un compte existe déjà pour cet e-mail, mais il n’a pas pu être lié. Vérifie Authentication → Users.",
+      };
+    }
+  }
+
+  const { error: linkError } = await admin
+    .from("athletes")
+    .update({ profile_id: userId })
+    .eq("id", params.athleteId);
+
+  if (linkError) {
+    return {
+      error: `Compte créé, mais liaison impossible : ${linkError.message}`,
+    };
+  }
+
+  await admin
+    .from("profiles")
+    .update({
+      first_name: params.firstName,
+      last_name: params.lastName,
+      email: params.email,
+    })
+    .eq("id", userId);
+
+  return { error: null };
+}
+
+async function findAuthUserIdByEmail(
+  admin: ReturnType<typeof createAdminClient>,
+  email: string,
+): Promise<string | null> {
+  const normalized = email.toLowerCase();
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({
+      page,
+      perPage: 200,
+    });
+    if (error) return null;
+    const found = data.users.find(
+      (user) => user.email?.toLowerCase() === normalized,
+    );
+    if (found) return found.id;
+    if (data.users.length < 200) break;
+  }
+  return null;
+}
 
 export async function createAthlete(
   _prev: AthleteFormState,
@@ -85,16 +186,30 @@ export async function createAthlete(
     athleteId = rpc.data;
   }
 
-  if (athleteId) {
-    await supabase.from("payments").upsert(
-      {
-        athlete_id: athleteId,
-        period_start: firstOfMonthISO(),
-        status: "pending",
-      },
-      { onConflict: "athlete_id,period_start" },
-    );
+  if (!athleteId) {
+    return { error: "Impossible de créer le sportif." };
   }
+
+  const authResult = await provisionAthleteAuthAccount({
+    athleteId,
+    email,
+    firstName,
+    lastName,
+  });
+  if (authResult.error) {
+    return {
+      error: `${authResult.error} (Le sportif a été créé dans le roster : tu peux réessayer ou vérifier la clé SUPABASE_SERVICE_ROLE_KEY.)`,
+    };
+  }
+
+  await supabase.from("payments").upsert(
+    {
+      athlete_id: athleteId,
+      period_start: firstOfMonthISO(),
+      status: "pending",
+    },
+    { onConflict: "athlete_id,period_start" },
+  );
 
   void profile;
 
