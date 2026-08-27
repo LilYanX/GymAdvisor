@@ -5,11 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/icons";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { useLoading } from "@/components/layout/LoadingProvider";
 
 type Mode = "login" | "reset";
 
 export function LoginForm() {
   const router = useRouter();
+  const { setLoading } = useLoading();
   const searchParams = useSearchParams();
   const authError = searchParams.get("error");
 
@@ -38,39 +40,43 @@ export function LoginForm() {
     setError(null);
     setInfo(null);
     setPending(true);
+    setLoading(true);
 
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     const supabase = createClient();
 
-    if (mode === "reset") {
-      const redirectTo = `${window.location.origin}/auth/callback?next=/login/nouveau-mot-de-passe`;
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        email,
-        { redirectTo },
-      );
-      setPending(false);
-      if (resetError) {
-        setError(resetError.message);
+    try {
+      if (mode === "reset") {
+        const redirectTo = `${window.location.origin}/auth/callback?next=/login/nouveau-mot-de-passe`;
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+          email,
+          { redirectTo },
+        );
+        if (resetError) {
+          setError(resetError.message);
+          return;
+        }
+        setInfo(
+          "Si un compte existe avec cet e-mail, tu recevras un lien pour choisir un nouveau mot de passe.",
+        );
         return;
       }
-      setInfo(
-        "Si un compte existe avec cet e-mail, tu recevras un lien pour choisir un nouveau mot de passe.",
-      );
-      return;
-    }
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    setPending(false);
-    if (signInError || !data.user) {
-      setError("E-mail ou mot de passe incorrect.");
-      return;
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInError || !data.user) {
+        setError("E-mail ou mot de passe incorrect.");
+        return;
+      }
+      await redirectByRole(data.user.id);
+    } finally {
+      setPending(false);
+      setLoading(false);
     }
-    await redirectByRole(data.user.id);
   }
 
   function switchMode(next: Mode) {

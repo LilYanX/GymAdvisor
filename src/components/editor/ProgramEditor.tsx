@@ -3,19 +3,21 @@
 import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type WheelEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { EditorData, EditorSessionExercise } from "@/lib/editor-types";
+import type { EditorData, EditorSession, EditorSessionExercise, EditorWeek } from "@/lib/editor-types";
 import {
   addExerciseToSession,
   addSession,
   deleteSession,
   ensureDraftWeek,
+  fetchEditorWeek,
   linkSupersetWithPrevious,
   moveSessionExercise,
   publishWeek,
   removeSessionExercise,
+  saveWeekDraft,
   unlinkFromSuperset,
-  updateSession,
   updateSessionExercise,
+  type WeekDraftPayload,
 } from "@/lib/actions/program";
 import {
   formatRest,
@@ -27,6 +29,7 @@ import {
 import type { SessionType } from "@/lib/supabase/models";
 import { IconPlus, IconTrash } from "@/components/icons";
 import { ExerciseMedia } from "@/components/media/ExerciseMedia";
+import { useLoading } from "@/components/layout/LoadingProvider";
 
 type ExerciseGroup =
   | { kind: "single"; item: EditorSessionExercise; index: number }
@@ -86,8 +89,59 @@ function groupLeadId(group: ExerciseGroup): string {
   return group.kind === "single" ? group.item.id : group.items[0].id;
 }
 
+function patchExerciseInWeek(
+  week: EditorWeek,
+  exerciseId: string,
+  patch: Partial<EditorSessionExercise>,
+): EditorWeek {
+  return {
+    ...week,
+    sessions: week.sessions.map((session) => ({
+      ...session,
+      session_exercises: session.session_exercises.map((exercise) =>
+        exercise.id === exerciseId ? { ...exercise, ...patch } : exercise,
+      ),
+    })),
+  };
+}
+
+function patchSessionInWeek(
+  week: EditorWeek,
+  sessionId: string,
+  patch: Partial<EditorSession>,
+): EditorWeek {
+  return {
+    ...week,
+    sessions: week.sessions.map((session) =>
+      session.id === sessionId ? { ...session, ...patch } : session,
+    ),
+  };
+}
+
+function serializeWeekDraft(week: EditorWeek): WeekDraftPayload {
+  return {
+    sessions: week.sessions.map((session) => ({
+      id: session.id,
+      title: session.title,
+      session_type: session.session_type,
+      rest_details: session.rest_details,
+      session_exercises: session.session_exercises.map((exercise) => ({
+        id: exercise.id,
+        sets_count: exercise.sets_count,
+        target_reps: exercise.target_reps,
+        target_weight_kg: exercise.target_weight_kg,
+        target_percent: exercise.target_percent,
+        target_rpe: exercise.target_rpe,
+        rest_seconds: exercise.rest_seconds,
+        coach_note: exercise.coach_note,
+      })),
+    })),
+  };
+}
+
 export function ProgramEditor({ data }: { data: EditorData }) {
   const router = useRouter();
+  const { setLoading } = useLoading();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
@@ -97,17 +151,26 @@ export function ProgramEditor({ data }: { data: EditorData }) {
   const [query, setQuery] = useState("");
   const [dragOverSessionId, setDragOverSessionId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [draftWeek, setDraftWeek] = useState<EditorWeek | null>(data.week);
+  const [dirty, setDirty] = useState(false);
   const libraryScrollRef = useRef<HTMLDivElement>(null);
   const sessionScrollRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
+  const week = data.week;
+  const editorWeek = draftWeek ?? week;
+
   useEffect(() => {
-    const ids = data.week?.sessions.map((session) => session.id) ?? [];
+    setDraftWeek(week);
+    setDirty(false);
+  }, [week, data.weekNumber, data.athlete.id]);
+
+  useEffect(() => {
+    const ids = editorWeek?.sessions.map((session) => session.id) ?? [];
     if (selectedSessionId && ids.includes(selectedSessionId)) return;
     setSelectedSessionId(ids[0] ?? null);
-  }, [data.week, selectedSessionId]);
+  }, [editorWeek, selectedSessionId]);
 
-  const week = data.week;
-  const usedDays = new Set(week?.sessions.map((session) => session.weekday) ?? []);
+  const usedDays = new Set(editorWeek?.sessions.map((session) => session.weekday) ?? []);
   const freeDays = WEEKDAYS.filter((day) => !usedDays.has(day.value));
 
   const filteredExercises = useMemo(() => {
@@ -118,15 +181,96 @@ export function ProgramEditor({ data }: { data: EditorData }) {
     );
   }, [data.exercises, query]);
 
+  function patchExercise(
+    exerciseId: string,
+    patch: Parameters<typeof updateSessionExercise>[1],
+  ) {
+    setDraftWeek((current) => {
+      if (!current) return current;
+      return patchExerciseInWeek(current, exerciseId, patch);
+    });
+    setDirty(true);
+  }
+
+  function patchSession(sessionId: string, patch: Partial<EditorSession>) {
+    setDraftWeek((current) => {
+      if (!current) return current;
+      return patchSessionInWeek(current, sessionId, patch);
+    });
+    setDirty(true);
+  }
+
+  async function ensureDraftSaved(currentWeek: EditorWeek) {
+    if (!dirty) return { error: null as string | null };
+    return saveWeekDraft(currentWeek.id, serializeWeekDraft(currentWeek));
+  }
+
+  async function reloadWeek(weekId: string) {
+    const result = await fetchEditorWeek(weekId);
+    if (result.error) return { error: result.error };
+    if (result.week) setDraftWeek(result.week);
+    setDirty(false);
+    return { error: null };
+  }
+
   function run(action: () => Promise<{ error: string | null }>) {
     setError(null);
+    setLoading(true);
     startTransition(async () => {
+      const currentWeek = draftWeek ?? week;
+      if (!currentWeek) {
+        setLoading(false);
+        return;
+      }
+
+      const saved = await ensureDraftSaved(currentWeek);
+      if (saved.error) {
+        setError(saved.error);
+        setLoading(false);
+        return;
+      }
+      setDirty(false);
+
       const result = await action();
       if (result.error) {
         setError(result.error);
+        setLoading(false);
         return;
       }
+
+      const reloaded = await reloadWeek(currentWeek.id);
+      if (reloaded.error) setError(reloaded.error);
+      setLoading(false);
+    });
+  }
+
+  function publish() {
+    setError(null);
+    setLoading(true);
+    startTransition(async () => {
+      const currentWeek = draftWeek ?? week;
+      if (!currentWeek) {
+        setLoading(false);
+        return;
+      }
+
+      const saved = await saveWeekDraft(currentWeek.id, serializeWeekDraft(currentWeek));
+      if (saved.error) {
+        setError(saved.error);
+        setLoading(false);
+        return;
+      }
+
+      const published = await publishWeek(currentWeek.id);
+      if (published.error) {
+        setError(published.error);
+        setLoading(false);
+        return;
+      }
+
+      setDirty(false);
       router.refresh();
+      setLoading(false);
     });
   }
 
@@ -188,10 +332,12 @@ export function ProgramEditor({ data }: { data: EditorData }) {
             Semaine {data.weekNumber} - {data.athlete.first_name}
           </h1>
           <p className="mt-1 text-sm text-ga-muted">
-            {week
-              ? week.status === "published"
+            {editorWeek
+              ? editorWeek.status === "published" && !dirty
                 ? "Publiée"
-                : "Brouillon"
+                : dirty
+                  ? "Brouillon · modifications non publiées"
+                  : "Brouillon"
               : "Cette semaine n’existe pas encore."}
           </p>
         </div>
@@ -216,15 +362,23 @@ export function ProgramEditor({ data }: { data: EditorData }) {
           <button
             type="button"
             disabled={pending}
-            onClick={() =>
-              run(async () => ensureDraftWeek(data.athlete.id, data.weekNumber))
-            }
+            onClick={() => {
+              setError(null);
+              startTransition(async () => {
+                const result = await ensureDraftWeek(
+                  data.athlete.id,
+                  data.weekNumber,
+                );
+                if (result.error) setError(result.error);
+                else router.refresh();
+              });
+            }}
             className="rounded-lg bg-ga-lime px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
           >
             Créer la semaine {data.weekNumber}
           </button>
         </div>
-      ) : (
+      ) : editorWeek ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <aside
             className="flex w-64 shrink-0 flex-col border-r border-ga-border bg-ga-panel md:w-72 lg:w-80 xl:w-[26rem] 2xl:w-[30rem]"
@@ -303,7 +457,7 @@ export function ProgramEditor({ data }: { data: EditorData }) {
 
           <div className="ga-scrollbar-hidden min-h-0 min-w-0 flex-1 overflow-x-auto p-5">
             <div className="flex h-full min-h-0 items-stretch gap-4">
-              {week.sessions.map((session) => (
+              {editorWeek.sessions.map((session) => (
                 <section
                   key={session.id}
                   className={`flex h-full max-h-full w-72 shrink-0 flex-col rounded-xl border bg-ga-card transition-shadow ${
@@ -348,14 +502,10 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                   </button>
                   <div className="flex items-start gap-2 px-4 pb-3">
                     <input
-                      defaultValue={session.title}
-                      key={session.updated_at}
-                      onBlur={(event) => {
-                        const title = event.target.value.trim();
-                        if (title && title !== session.title) {
-                          run(() => updateSession(session.id, { title }));
-                        }
-                      }}
+                      value={session.title}
+                      onChange={(event) =>
+                        patchSession(session.id, { title: event.target.value })
+                      }
                       className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none"
                     />
                     <button
@@ -370,14 +520,11 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                     </button>
                   </div>
                   <select
-                    defaultValue={session.session_type}
-                    key={`${session.id}-${session.session_type}`}
+                    value={session.session_type}
                     onChange={(event) =>
-                      run(() =>
-                        updateSession(session.id, {
-                          session_type: event.target.value as SessionType,
-                        }),
-                      )
+                      patchSession(session.id, {
+                        session_type: event.target.value as SessionType,
+                      })
                     }
                     className="mx-4 mb-3 w-[calc(100%-2rem)] rounded-md border border-ga-border bg-ga-elevated px-2 py-1 text-xs"
                   >
@@ -430,9 +577,7 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                                     current === item.id ? null : item.id,
                                   )
                                 }
-                                onSave={(patch) =>
-                                  run(() => updateSessionExercise(item.id, patch))
-                                }
+                                onSave={(patch) => patchExercise(item.id, patch)}
                                 onRemove={() =>
                                   run(() => removeSessionExercise(item.id))
                                 }
@@ -463,9 +608,7 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                               current === group.item.id ? null : group.item.id,
                             )
                           }
-                          onSave={(patch) =>
-                            run(() => updateSessionExercise(group.item.id, patch))
-                          }
+                          onSave={(patch) => patchExercise(group.item.id, patch)}
                           onRemove={() =>
                             run(() => removeSessionExercise(group.item.id))
                           }
@@ -503,7 +646,7 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                       disabled={pending}
                       onClick={() =>
                         run(() =>
-                          addSession(week.id, day.value, day.label),
+                          addSession(editorWeek.id, day.value, day.label),
                         )
                       }
                       className="flex items-center gap-2 rounded-lg bg-ga-elevated px-3 py-2 text-sm text-ga-muted hover:text-ga-fg disabled:opacity-50"
@@ -518,25 +661,27 @@ export function ProgramEditor({ data }: { data: EditorData }) {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {week ? (
+      {editorWeek ? (
         <footer className="shrink-0 border-t border-ga-border bg-ga-panel px-6 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-ga-muted">
               {error ? (
                 <span className="text-ga-red">{error}</span>
-              ) : week.status === "draft" ? (
-                `Brouillon - dernière sauvegarde ${new Date(week.updated_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`
-              ) : (
+              ) : dirty ? (
+                "Modifications non publiées"
+              ) : editorWeek.status === "published" ? (
                 "Publiée"
+              ) : (
+                "Brouillon"
               )}
-              {pending ? " · Enregistrement…" : ""}
+              {pending ? " · Chargement…" : ""}
             </p>
             <button
               type="button"
               disabled={pending}
-              onClick={() => run(() => publishWeek(week.id))}
+              onClick={publish}
               className="rounded-lg bg-ga-lime px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
             >
               Publier la semaine
@@ -643,49 +788,46 @@ function ExerciseBlock({
         <div className="grid grid-cols-2 gap-2 border-t border-ga-border p-3">
           <NumberField
             label="Séries"
-            defaultValue={item.sets_count}
+            value={item.sets_count}
             disabled={pending}
-            onCommit={(value) => onSave({ sets_count: value ?? 1 })}
+            onChange={(value) => onSave({ sets_count: value ?? 1 })}
           />
           <NumberField
             label="Reps"
-            defaultValue={item.target_reps}
+            value={item.target_reps}
             disabled={pending}
-            onCommit={(value) => onSave({ target_reps: value ?? 1 })}
+            onChange={(value) => onSave({ target_reps: value ?? 1 })}
           />
           <NumberField
             label="Charge (kg)"
-            defaultValue={item.target_weight_kg}
+            value={item.target_weight_kg}
             disabled={pending}
-            onCommit={(value) => onSave({ target_weight_kg: value })}
+            onChange={(value) => onSave({ target_weight_kg: value })}
           />
           <NumberField
             label="% 1RM"
-            defaultValue={item.target_percent}
+            value={item.target_percent}
             disabled={pending}
-            onCommit={(value) => onSave({ target_percent: value })}
+            onChange={(value) => onSave({ target_percent: value })}
           />
           <NumberField
             label="RPE cible"
-            defaultValue={item.target_rpe}
+            value={item.target_rpe}
             disabled={pending}
-            onCommit={(value) => onSave({ target_rpe: value })}
+            onChange={(value) => onSave({ target_rpe: value })}
           />
           <NumberField
             label="Repos (sec)"
-            defaultValue={item.rest_seconds}
+            value={item.rest_seconds}
             disabled={pending}
-            onCommit={(value) => onSave({ rest_seconds: value })}
+            onChange={(value) => onSave({ rest_seconds: value })}
           />
           <label className="col-span-2 text-xs text-ga-muted">
             Note
             <input
-              defaultValue={item.coach_note}
+              value={item.coach_note}
               disabled={pending}
-              onBlur={(event) => {
-                const coach_note = event.target.value;
-                if (coach_note !== item.coach_note) onSave({ coach_note });
-              }}
+              onChange={(event) => onSave({ coach_note: event.target.value })}
               className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1.5 text-sm text-ga-fg outline-none focus:border-ga-lime"
             />
           </label>
@@ -719,14 +861,14 @@ function ExerciseBlock({
 
 function NumberField({
   label,
-  defaultValue,
+  value,
   disabled,
-  onCommit,
+  onChange,
 }: {
   label: string;
-  defaultValue: number | null;
+  value: number | null;
   disabled: boolean;
-  onCommit: (value: number | null) => void;
+  onChange: (value: number | null) => void;
 }) {
   return (
     <label className="text-xs text-ga-muted">
@@ -734,13 +876,11 @@ function NumberField({
       <input
         type="number"
         step="any"
-        defaultValue={defaultValue ?? ""}
+        value={value ?? ""}
         disabled={disabled}
-        onBlur={(event) => {
+        onChange={(event) => {
           const raw = event.target.value.trim();
-          const next = raw === "" ? null : Number(raw);
-          const current = defaultValue;
-          if (next !== current) onCommit(next);
+          onChange(raw === "" ? null : Number(raw));
         }}
         className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1.5 text-sm text-ga-fg outline-none focus:border-ga-lime"
       />

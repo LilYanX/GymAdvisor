@@ -9,6 +9,7 @@ import {
 } from "@/lib/actions/exercises";
 import { MUSCLE_GROUP_LABELS } from "@/lib/labels";
 import { ExerciseVideoUpload } from "@/components/library/ExerciseVideoUpload";
+import { useLoadingActive } from "@/components/layout/LoadingProvider";
 import type { Exercise, MuscleGroup } from "@/lib/supabase/models";
 
 const initial: ExerciseFormState = { error: null };
@@ -18,10 +19,11 @@ export function EditExerciseForm({ exercise }: { exercise: Exercise }) {
   const [state, action, pending] = useActionState(updateExercise, initial);
   const [deleting, startDelete] = useTransition();
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  useLoadingActive(pending || deleting);
 
   return (
-    <div className="flex flex-col gap-5">
-      <section className="rounded-xl border border-ga-border bg-ga-card p-5">
+    <div className="flex min-w-0 flex-col gap-5">
+      <section className="min-w-0 rounded-xl border border-ga-border bg-ga-card p-5">
         <h2 className="text-base font-semibold">Vidéo</h2>
         <ExerciseVideoUpload
           key={exercise.id}
@@ -33,10 +35,10 @@ export function EditExerciseForm({ exercise }: { exercise: Exercise }) {
       <form
         key={exercise.updated_at}
         action={action}
-        className="grid gap-3 rounded-xl border border-ga-border bg-ga-card p-5 md:grid-cols-2"
+        className="grid min-w-0 gap-3 rounded-xl border border-ga-border bg-ga-card p-5 sm:grid-cols-2"
       >
         <input type="hidden" name="exercise_id" value={exercise.id} />
-        <label className="text-sm md:col-span-2">
+        <label className="min-w-0 text-sm sm:col-span-2">
           <span className="mb-1.5 block text-ga-muted">Nom</span>
           <input
             name="name"
@@ -45,7 +47,7 @@ export function EditExerciseForm({ exercise }: { exercise: Exercise }) {
             className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
           />
         </label>
-        <label className="text-sm">
+        <label className="min-w-0 text-sm">
           <span className="mb-1.5 block text-ga-muted">Groupe</span>
           <select
             name="muscle_group"
@@ -59,7 +61,7 @@ export function EditExerciseForm({ exercise }: { exercise: Exercise }) {
             ))}
           </select>
         </label>
-        <label className="text-sm">
+        <label className="min-w-0 text-sm">
           <span className="mb-1.5 block text-ga-muted">URL vidéo / GIF</span>
           <input
             name="video_url"
@@ -68,7 +70,7 @@ export function EditExerciseForm({ exercise }: { exercise: Exercise }) {
             className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
           />
         </label>
-        <label className="text-sm md:col-span-2">
+        <label className="min-w-0 text-sm sm:col-span-2">
           <span className="mb-1.5 block text-ga-muted">Consignes (une par ligne)</span>
           <textarea
             name="cues"
@@ -77,7 +79,7 @@ export function EditExerciseForm({ exercise }: { exercise: Exercise }) {
             className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
           />
         </label>
-        <label className="text-sm md:col-span-2">
+        <label className="min-w-0 text-sm sm:col-span-2">
           <span className="mb-1.5 block text-ga-muted">Points de vigilance</span>
           <textarea
             name="vigilance_points"
@@ -87,11 +89,11 @@ export function EditExerciseForm({ exercise }: { exercise: Exercise }) {
           />
         </label>
         {state.error || deleteError ? (
-          <p className="text-sm text-ga-red md:col-span-2">
+          <p className="text-sm text-ga-red sm:col-span-2">
             {state.error ?? deleteError}
           </p>
         ) : null}
-        <div className="flex flex-wrap gap-2 md:col-span-2">
+        <div className="flex flex-wrap gap-2 sm:col-span-2">
           <button
             type="submit"
             disabled={pending || deleting}

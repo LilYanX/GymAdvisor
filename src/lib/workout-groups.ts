@@ -1,4 +1,5 @@
 import type { AthleteExercise } from "@/lib/athlete-types";
+import { resolveExerciseSets } from "@/lib/athlete-sets";
 
 export type WorkoutGroup =
   | { kind: "single"; item: AthleteExercise }
@@ -36,7 +37,8 @@ export function workoutGroupItems(group: WorkoutGroup): AthleteExercise[] {
 }
 
 export function isExerciseComplete(item: AthleteExercise): boolean {
-  return item.sets.length > 0 && item.sets.every((set) => set.completed);
+  if (item.sets_count <= 0) return true;
+  return resolveExerciseSets(item).every((set) => set.completed);
 }
 
 export function isWorkoutGroupComplete(group: WorkoutGroup): boolean {

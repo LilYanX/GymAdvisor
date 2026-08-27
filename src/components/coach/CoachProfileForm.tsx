@@ -5,12 +5,14 @@ import {
   updateCoachProfile,
   type ProfileFormState,
 } from "@/lib/actions/profile";
+import { useLoadingActive } from "@/components/layout/LoadingProvider";
 import type { Profile } from "@/lib/supabase/models";
 
 const initial: ProfileFormState = { error: null };
 
 export function CoachProfileForm({ profile }: { profile: Profile }) {
   const [state, action, pending] = useActionState(updateCoachProfile, initial);
+  useLoadingActive(pending);
 
   return (
     <form action={action} className="grid max-w-xl gap-4 rounded-xl border border-ga-border bg-ga-card p-6">

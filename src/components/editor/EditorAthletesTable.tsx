@@ -20,8 +20,8 @@ export function EditorAthletesTable({
     <section className="ga-table-wrap ga-scrollbar-hidden w-full min-w-0 overflow-x-auto rounded-xl border border-ga-border bg-ga-card">
       {athletes.length === 0 ? (
         <p className="p-5 text-sm text-ga-muted">
-          Aucun sportif. Ajoute-en un dans{" "}
-          <Link href="/sportifs/nouveau?redirect=/editeur" className="text-ga-lime hover:underline">
+          Aucun sportif. Ajoute-en un depuis la page{" "}
+          <Link href="/sportifs" className="text-ga-lime hover:underline">
             Sportifs
           </Link>
           .

@@ -6,6 +6,7 @@ import { signOut } from "@/lib/actions/auth";
 import type { CheckIn } from "@/lib/supabase/models";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { FixedBottomBar } from "@/components/layout/FixedBottomBar";
+import { useLoadingActive } from "@/components/layout/LoadingProvider";
 
 const initial: CheckInState = { error: null, ok: false };
 
@@ -50,17 +51,13 @@ export function CheckInForm({
   existing: CheckIn | null;
 }) {
   const [state, action, pending] = useActionState(submitCheckIn, initial);
+  useLoadingActive(pending);
 
   return (
     <>
       <div className="px-5 pb-32 pt-8">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-ga-muted">Check-in hebdomadaire</p>
-            <h1 className="mt-1 text-2xl font-semibold">
-              Comment tu te sens cette semaine ?
-            </h1>
-          </div>
+          <h1 className="text-2xl font-semibold">Comment tu te sens cette semaine ?</h1>
           <ThemeToggle />
         </div>
 
@@ -69,21 +66,15 @@ export function CheckInForm({
           <Scale name="sleep" label="Sommeil" defaultValue={existing?.sleep} />
           <Scale name="pain" label="Douleurs" defaultValue={existing?.pain} />
           <label className="text-sm">
-            <span className="text-ga-muted">
-              Un mot pour {coachFirstName} (optionnel)
-            </span>
+            <span>Un mot pour {coachFirstName}</span>
             <textarea
               name="comment"
               defaultValue={existing?.comment ?? ""}
               rows={3}
-              placeholder="Ce que tu veux ajouter sur ta semaine..."
               className="mt-2 w-full rounded-xl border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
             />
           </label>
           {state.error ? <p className="text-sm text-ga-red">{state.error}</p> : null}
-          {state.ok ? (
-            <p className="text-sm text-ga-lime">C’est envoyé. Merci.</p>
-          ) : null}
         </form>
 
         <form action={signOut} className="mt-10">

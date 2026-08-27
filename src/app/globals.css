@@ -115,3 +115,29 @@ input[type="number"]::-webkit-outer-spin-button {
 .ga-scroll-hover:hover {
   overflow-y: auto;
 }
+
+.ga-ecg-viewport {
+  position: relative;
+  height: 6rem;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+}
+
+.ga-ecg-canvas {
+  display: block;
+  width: 100%;
+  height: 6rem;
+}

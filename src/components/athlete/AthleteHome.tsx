@@ -15,14 +15,13 @@ export function AthleteHome({ data }: { data: AthleteProgram }) {
 
   return (
     <div className="px-5 pb-6 pt-8">
-      <p className="text-sm text-ga-muted">Salut {data.athlete.first_name}</p>
-      <h1 className="mt-1 text-3xl font-semibold">
+      <h1 className="text-3xl font-semibold">
         Semaine {data.athlete.current_week}/{data.athlete.total_weeks}
       </h1>
 
       {data.programJustPublished ? (
         <section className="mt-4 rounded-xl border border-ga-lime/40 bg-ga-lime/10 p-4 text-sm">
-          Nouveau programme publié.
+          Nouveau programme
         </section>
       ) : null}
 
@@ -45,12 +44,10 @@ export function AthleteHome({ data }: { data: AthleteProgram }) {
                 : `${workout.exercises.length} exercice${workout.exercises.length > 1 ? "s" : ""}`}
             </span>
           </div>
-          {today?.kind === "completed" ? (
-            <p className="mt-4 text-sm text-ga-lime">Séance renseignée. Bravo.</p>
-          ) : workout.session_type === "rest" ? (
-            <p className="mt-4 text-sm text-ga-muted">
-              {workout.rest_details || "Jour de récupération."}
-            </p>
+          {today?.kind === "completed" ? null : workout.session_type === "rest" ? (
+            workout.rest_details ? (
+              <p className="mt-4 text-sm text-ga-muted">{workout.rest_details}</p>
+            ) : null
           ) : (
             <Link
               href={`/app/seance/${workout.id}`}
@@ -60,13 +57,7 @@ export function AthleteHome({ data }: { data: AthleteProgram }) {
             </Link>
           )}
         </section>
-      ) : (
-        <section className="mt-6 rounded-2xl border border-ga-border bg-ga-card p-5 text-sm text-ga-muted">
-          {data.week
-            ? "Pas de séance prévue aujourd’hui."
-            : "Ton coach n’a pas encore publié de programme."}
-        </section>
-      )}
+      ) : null}
 
       {data.days.length > 0 ? (
         <section className="mt-8">
@@ -98,15 +89,11 @@ export function AthleteHome({ data }: { data: AthleteProgram }) {
 
       {data.overdue ? (
         <section className="mt-8 rounded-xl border border-ga-amber/40 bg-ga-amber/10 p-4">
-          <p className="text-sm">
-            Pense à renseigner ta séance - {data.coachFirstName} en a besoin pour
-            la suite.
-          </p>
           <Link
             href={`/app/seance/${data.overdue.session.id}`}
-            className="mt-3 inline-block text-sm font-medium text-ga-amber"
+            className="text-sm font-medium text-ga-amber"
           >
-            Compléter →
+            Compléter la séance →
           </Link>
         </section>
       ) : null}

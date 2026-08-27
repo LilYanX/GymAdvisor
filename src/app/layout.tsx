@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
+import { SiteLoader } from "@/components/layout/SiteLoader";
+import { LoadingProvider } from "@/components/layout/LoadingProvider";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -25,7 +27,10 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className={`${inter.className} min-h-screen bg-ga-bg text-ga-fg antialiased`}>
-        {children}
+        <LoadingProvider>
+          <SiteLoader />
+          {children}
+        </LoadingProvider>
       </body>
     </html>
   );

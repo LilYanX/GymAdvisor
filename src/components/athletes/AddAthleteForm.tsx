@@ -5,11 +5,13 @@ import {
   createAthlete,
   type AthleteFormState,
 } from "@/lib/actions/athletes";
+import { useLoadingActive } from "@/components/layout/LoadingProvider";
 
 const initial: AthleteFormState = { error: null };
 
 export function AddAthleteForm({ redirectTo }: { redirectTo?: string }) {
   const [state, action, pending] = useActionState(createAthlete, initial);
+  useLoadingActive(pending);
 
   return (
     <form

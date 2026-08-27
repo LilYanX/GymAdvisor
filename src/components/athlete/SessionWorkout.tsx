@@ -10,6 +10,8 @@ import {
 } from "@/lib/actions/session";
 import { ExerciseMedia } from "@/components/media/ExerciseMedia";
 import { FixedBottomBar } from "@/components/layout/FixedBottomBar";
+import { useLoadingActive } from "@/components/layout/LoadingProvider";
+import { resolveExerciseSets } from "@/lib/athlete-sets";
 import {
   groupWorkoutExercises,
   workoutGroupItems,
@@ -24,22 +26,6 @@ function prescription(item: AthleteExercise): string {
   return parts.join(", ");
 }
 
-function resolveSets(item: AthleteExercise) {
-  return item.sets.length > 0
-    ? item.sets
-    : Array.from({ length: item.sets_count }, (_, setIndex) => ({
-        id: `local-${setIndex}`,
-        session_exercise_id: item.id,
-        athlete_id: "",
-        set_number: setIndex + 1,
-        weight_kg: item.target_weight_kg,
-        reps: item.target_reps,
-        completed: false,
-        created_at: "",
-        updated_at: "",
-      }));
-}
-
 function ExercisePanel({
   item,
   compact,
@@ -51,7 +37,7 @@ function ExercisePanel({
   pending: boolean;
   run: (action: () => Promise<{ error: string | null }>) => void;
 }) {
-  const sets = resolveSets(item);
+  const sets = resolveExerciseSets(item);
   const videoUrl = item.exercise?.video_url;
 
   return (
@@ -194,7 +180,7 @@ function ExercisePanel({
       </div>
 
       <label className="mt-4 block text-sm text-ga-muted">
-        Commentaire (optionnel)
+        Commentaire
         <textarea
           defaultValue={item.log?.comment ?? ""}
           key={item.id}
@@ -234,11 +220,7 @@ function GroupContent({
 
   return (
     <div className="space-y-4">
-      <p className="rounded-lg border border-ga-blue/40 bg-ga-blue/10 px-3 py-2 text-sm font-medium text-ga-blue">
-        Superset — effectue les exercices l&apos;un après l&apos;autre
-      </p>
-      <div className="space-y-4">
-        {group.items.map((item) => (
+      {group.items.map((item) => (
           <ExercisePanel
             key={item.id}
             item={item}
@@ -247,7 +229,6 @@ function GroupContent({
             run={run}
           />
         ))}
-      </div>
     </div>
   );
 }
@@ -268,6 +249,7 @@ export function SessionWorkout({
     Math.min(Math.max(startIndex, 0), Math.max(groups.length - 1, 0)),
   );
   const [pending, startTransition] = useTransition();
+  useLoadingActive(pending);
   const [error, setError] = useState<string | null>(null);
 
   const group = groups[index];

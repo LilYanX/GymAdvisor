@@ -23,26 +23,33 @@ export default async function EditExercisePage({ params }: Props) {
   if (!exercise) notFound();
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-8">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="min-w-0 flex-1 overflow-y-auto p-6 lg:p-8">
         <Link
           href="/bibliotheque"
           className="text-sm text-ga-muted hover:text-ga-fg"
         >
           ← Bibliothèque
         </Link>
-        <div>
-          <h1 className="text-2xl font-semibold">{exercise.name}</h1>
+
+        <h1 className="mt-4 text-2xl font-semibold">{exercise.name}</h1>
+
+        <div className="mt-6 grid w-full min-w-0 gap-8 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]">
+          <div className="min-w-0 lg:sticky lg:top-0 lg:self-start">
+            <div className="overflow-hidden rounded-xl bg-ga-elevated">
+              <ExerciseMedia
+                url={exercise.video_url}
+                name={exercise.name}
+                className="aspect-video w-full"
+                playing
+              />
+            </div>
+          </div>
+
+          <div className="min-w-0">
+            <EditExerciseForm exercise={exercise} />
+          </div>
         </div>
-        <div className="overflow-hidden rounded-xl bg-ga-elevated">
-          <ExerciseMedia
-            url={exercise.video_url}
-            name={exercise.name}
-            className="h-48 w-full"
-            playing
-          />
-        </div>
-        <EditExerciseForm exercise={exercise} />
       </div>
     </div>
   );

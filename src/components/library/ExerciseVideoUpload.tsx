@@ -7,6 +7,7 @@ import {
   removeStoredExerciseVideo,
   uploadExerciseVideo,
 } from "@/lib/storage/exercise-videos";
+import { useLoadingActive } from "@/components/layout/LoadingProvider";
 
 export function ExerciseVideoUpload({
   exerciseId,
@@ -22,28 +23,37 @@ export function ExerciseVideoUpload({
   const [error, setError] = useState<string | null>(null);
 
   const busy = pending || uploading;
+  useLoadingActive(busy);
 
   async function onFile(file: File | undefined) {
     if (!file) return;
     setError(null);
     setUploading(true);
-    const uploaded = await uploadExerciseVideo(file);
-    if ("error" in uploaded) {
-      setUploading(false);
-      setError(uploaded.error);
-      return;
-    }
-    startTransition(async () => {
-      const result = await updateExerciseVideo(exerciseId, uploaded.url);
-      setUploading(false);
-      if (result.error) {
-        setError(result.error);
-        await removeStoredExerciseVideo(uploaded.url);
+
+    try {
+      const uploaded = await uploadExerciseVideo(file);
+      if ("error" in uploaded) {
+        setError(uploaded.error);
         return;
       }
-      if (currentUrl) await removeStoredExerciseVideo(currentUrl);
-      router.refresh();
-    });
+
+      await new Promise<void>((resolve) => {
+        startTransition(async () => {
+          const result = await updateExerciseVideo(exerciseId, uploaded.url);
+          if (result.error) {
+            setError(result.error);
+            await removeStoredExerciseVideo(uploaded.url);
+            resolve();
+            return;
+          }
+          if (currentUrl) await removeStoredExerciseVideo(currentUrl);
+          router.refresh();
+          resolve();
+        });
+      });
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (

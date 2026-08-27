@@ -23,12 +23,6 @@ export default async function EditorPage({ searchParams }: Props) {
             <div>
               <h1 className="text-2xl font-semibold">Éditeur de programme</h1>
             </div>
-            <Link
-              href="/sportifs/nouveau?redirect=/editeur"
-              className="shrink-0 rounded-lg bg-ga-lime px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
-            >
-              Ajouter un sportif
-            </Link>
           </div>
           <EditorAthletesTable athletes={result.overview} />
         </div>
@@ -59,13 +53,12 @@ function AthleteBar({
 }) {
   if (athletes.length === 0) {
     return (
-      <div className="border-b border-ga-border px-6 py-3">
-        <Link
-          href="/sportifs/nouveau?redirect=/editeur"
-          className="text-sm text-ga-lime hover:underline"
-        >
-          Ajouter un sportif
+      <div className="border-b border-ga-border px-6 py-3 text-sm text-ga-muted">
+        Aucun sportif. Ajoute-en un depuis la page{" "}
+        <Link href="/sportifs" className="text-ga-lime hover:underline">
+          Sportifs
         </Link>
+        .
       </div>
     );
   }

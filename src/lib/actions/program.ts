@@ -98,7 +98,6 @@ export async function addSession(weekId: string, weekday: number, title: string)
   }
 
   void profile;
-  revalidateEditor();
   return { error: null };
 }
 
@@ -110,7 +109,6 @@ export async function updateSession(
   const supabase = await createClient();
   const { error } = await supabase.from("sessions").update(patch).eq("id", sessionId);
   if (error) return { error: error.message };
-  revalidateEditor();
   return { error: null };
 }
 
@@ -119,7 +117,6 @@ export async function deleteSession(sessionId: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("sessions").delete().eq("id", sessionId);
   if (error) return { error: error.message };
-  revalidateEditor();
   return { error: null };
 }
 
@@ -226,7 +223,6 @@ export async function moveSessionExercise(
   );
   if (result.error) return result;
 
-  revalidateEditor();
   return { error: null };
 }
 
@@ -286,7 +282,6 @@ export async function updateSessionExercise(
   const supabase = await createClient();
   const { error } = await supabase.from("session_exercises").update(patch).eq("id", id);
   if (error) return { error: error.message };
-  revalidateEditor();
   return { error: null };
 }
 
@@ -316,8 +311,131 @@ export async function removeSessionExercise(id: string) {
     }
   }
 
-  revalidateEditor();
   return { error: null };
+}
+
+export type WeekDraftPayload = {
+  sessions: Array<{
+    id: string;
+    title: string;
+    session_type: SessionType;
+    rest_details: string | null;
+    session_exercises: Array<{
+      id: string;
+      sets_count: number;
+      target_reps: number;
+      target_weight_kg: number | null;
+      target_percent: number | null;
+      target_rpe: number | null;
+      rest_seconds: number | null;
+      coach_note: string;
+    }>;
+  }>;
+};
+
+export async function saveWeekDraft(weekId: string, payload: WeekDraftPayload) {
+  const { profile } = await requireCoach();
+  const supabase = await createClient();
+
+  const { data: week } = await supabase
+    .from("program_weeks")
+    .select("athlete_id")
+    .eq("id", weekId)
+    .maybeSingle();
+  if (!week) return { error: "Semaine introuvable." };
+
+  const owned = await getOwnedAthlete(week.athlete_id);
+  if (owned.error) return { error: owned.error };
+
+  for (const session of payload.sessions) {
+    const { error: sessionError } = await supabase
+      .from("sessions")
+      .update({
+        title: session.title.trim() || session.title,
+        session_type: session.session_type,
+        rest_details: session.rest_details ?? undefined,
+      })
+      .eq("id", session.id);
+    if (sessionError) return { error: sessionError.message };
+
+    for (const exercise of session.session_exercises) {
+      const { error: exerciseError } = await supabase
+        .from("session_exercises")
+        .update({
+          sets_count: exercise.sets_count,
+          target_reps: exercise.target_reps,
+          target_weight_kg: exercise.target_weight_kg,
+          target_percent: exercise.target_percent,
+          target_rpe: exercise.target_rpe,
+          rest_seconds: exercise.rest_seconds,
+          coach_note: exercise.coach_note,
+        })
+        .eq("id", exercise.id);
+      if (exerciseError) return { error: exerciseError.message };
+    }
+  }
+
+  const { error: weekError } = await supabase
+    .from("program_weeks")
+    .update({ status: "draft", published_at: null })
+    .eq("id", weekId);
+  if (weekError) return { error: weekError.message };
+
+  void profile;
+  return { error: null };
+}
+
+export async function fetchEditorWeek(weekId: string) {
+  await requireCoach();
+  const supabase = await createClient();
+
+  const { data: weekRow } = await supabase
+    .from("program_weeks")
+    .select("*")
+    .eq("id", weekId)
+    .maybeSingle();
+  if (!weekRow) return { error: "Semaine introuvable.", week: null };
+
+  const owned = await getOwnedAthlete(weekRow.athlete_id);
+  if (owned.error) return { error: owned.error, week: null };
+
+  const [{ data: sessions }, { data: exercises }] = await Promise.all([
+    supabase
+      .from("sessions")
+      .select("*")
+      .eq("program_week_id", weekId)
+      .order("weekday"),
+    supabase.from("exercises").select("*"),
+  ]);
+
+  const sessionRows = sessions ?? [];
+  const sessionIds = sessionRows.map((session) => session.id);
+
+  const { data: sessionExercises } = sessionIds.length
+    ? await supabase
+        .from("session_exercises")
+        .select("*")
+        .in("session_id", sessionIds)
+        .order("sort_order")
+    : { data: [] };
+
+  const exerciseById = new Map((exercises ?? []).map((item) => [item.id, item]));
+
+  return {
+    error: null,
+    week: {
+      ...weekRow,
+      sessions: sessionRows.map((session) => ({
+        ...session,
+        session_exercises: (sessionExercises ?? [])
+          .filter((item) => item.session_id === session.id)
+          .map((item) => ({
+            ...item,
+            exercise: exerciseById.get(item.exercise_id) ?? null,
+          })),
+      })),
+    },
+  };
 }
 
 export async function linkSupersetWithPrevious(sessionExerciseId: string) {
@@ -355,7 +473,6 @@ export async function linkSupersetWithPrevious(sessionExerciseId: string) {
     .in("id", ids);
 
   if (error) return { error: error.message };
-  revalidateEditor();
   return { error: null };
 }
 
@@ -388,7 +505,6 @@ export async function unlinkFromSuperset(sessionExerciseId: string) {
       .eq("id", siblings[0].id);
   }
 
-  revalidateEditor();
   return { error: null };
 }
 

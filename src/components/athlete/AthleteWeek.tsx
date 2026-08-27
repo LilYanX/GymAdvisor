@@ -5,16 +5,11 @@ import { weekdayLabel } from "@/lib/labels";
 export function AthleteWeek({ data }: { data: AthleteProgram }) {
   return (
     <div className="px-5 pb-6 pt-8">
-      <p className="text-sm text-ga-muted">Ton programme</p>
-      <h1 className="mt-1 text-3xl font-semibold">
+      <h1 className="text-3xl font-semibold">
         Semaine {data.week?.week_number ?? data.athlete.current_week}
       </h1>
 
-      {data.days.length === 0 ? (
-        <p className="mt-6 text-sm text-ga-muted">
-          Aucun programme publié pour le moment.
-        </p>
-      ) : (
+      {data.days.length === 0 ? null : (
         <div className="mt-6 flex flex-col gap-3">
           {data.days.map((day) => {
             const session = day.session;
@@ -33,10 +28,10 @@ export function AthleteWeek({ data }: { data: AthleteProgram }) {
 
             const details =
               session.session_type === "rest"
-                ? session.rest_details || "Récupération"
-                : day.kind === "completed"
-                  ? `${session.exercises.length} exercices`
-                  : `${session.exercises.length} exercices${session.estimated_minutes ? ` · ~${session.estimated_minutes} min` : ""}`;
+                ? session.rest_details
+                : session.estimated_minutes && day.kind !== "completed"
+                  ? `~${session.estimated_minutes} min`
+                  : null;
 
             const content = (
               <article className="rounded-2xl border border-ga-border bg-ga-card p-4">
@@ -49,7 +44,9 @@ export function AthleteWeek({ data }: { data: AthleteProgram }) {
                   </span>
                 </div>
                 <h2 className="mt-2 font-semibold">{session.title}</h2>
-                <p className="mt-1 text-sm text-ga-muted">{details}</p>
+                {details ? (
+                  <p className="mt-1 text-sm text-ga-muted">{details}</p>
+                ) : null}
               </article>
             );
 

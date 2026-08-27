@@ -1,37 +1,50 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import {
   createExercise,
   type ExerciseFormState,
 } from "@/lib/actions/exercises";
 import { MUSCLE_GROUP_LABELS } from "@/lib/labels";
 import { uploadExerciseVideo } from "@/lib/storage/exercise-videos";
+import { useLoading } from "@/components/layout/LoadingProvider";
 import type { MuscleGroup } from "@/lib/supabase/models";
 
 const initial: ExerciseFormState = { error: null };
 
 export function ExerciseForm() {
+  const { setLoading } = useLoading();
   const [state, formAction, pending] = useActionState(createExercise, initial);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (state.error) setUploading(false);
+  }, [state.error]);
+
   async function handleSubmit(formData: FormData) {
+    setLoading(true);
     setUploadError(null);
-    const file = formData.get("video_file");
-    if (file instanceof File && file.size > 0) {
-      setUploading(true);
-      const result = await uploadExerciseVideo(file);
-      setUploading(false);
-      if ("error" in result) {
-        setUploadError(result.error);
-        return;
+
+    try {
+      const file = formData.get("video_file");
+      if (file instanceof File && file.size > 0) {
+        setUploading(true);
+        const result = await uploadExerciseVideo(file);
+        if ("error" in result) {
+          setUploadError(result.error);
+          return;
+        }
+        formData.set("video_url", result.url);
       }
-      formData.set("video_url", result.url);
+
+      formData.delete("video_file");
+      await formAction(formData);
+    } finally {
+      setUploading(false);
+      setLoading(false);
     }
-    formData.delete("video_file");
-    await formAction(formData);
   }
 
   const busy = pending || uploading;
@@ -39,9 +52,9 @@ export function ExerciseForm() {
   return (
     <form
       action={handleSubmit}
-      className="grid gap-3 rounded-xl border border-ga-border bg-ga-card p-5 md:grid-cols-2"
+      className="grid min-w-0 gap-3 rounded-xl border border-ga-border bg-ga-card p-5 sm:grid-cols-2 xl:grid-cols-3"
     >
-      <label className="text-sm">
+      <label className="min-w-0 text-sm sm:col-span-2 xl:col-span-1">
         <span className="mb-1.5 block text-ga-muted">Nom</span>
         <input
           name="name"
@@ -50,7 +63,7 @@ export function ExerciseForm() {
           className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
         />
       </label>
-      <label className="text-sm">
+      <label className="min-w-0 text-sm">
         <span className="mb-1.5 block text-ga-muted">Groupe</span>
         <select
           name="muscle_group"
@@ -64,7 +77,7 @@ export function ExerciseForm() {
           ))}
         </select>
       </label>
-      <label className="text-sm md:col-span-2">
+      <label className="min-w-0 text-sm sm:col-span-2 xl:col-span-3">
         <span className="mb-1.5 block text-ga-muted">
           Vidéo MP4 depuis ton appareil
         </span>
@@ -83,7 +96,7 @@ export function ExerciseForm() {
           {fileName ? ` · ${fileName}` : ""}
         </span>
       </label>
-      <label className="text-sm md:col-span-2">
+      <label className="min-w-0 text-sm sm:col-span-2 xl:col-span-1">
         <span className="mb-1.5 block text-ga-muted">
           Ou URL (YouTube, GIF, lien)
         </span>
@@ -94,7 +107,7 @@ export function ExerciseForm() {
           className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
         />
       </label>
-      <label className="text-sm md:col-span-2">
+      <label className="min-w-0 text-sm sm:col-span-2">
         <span className="mb-1.5 block text-ga-muted">
           Consignes (une par ligne)
         </span>
@@ -104,7 +117,7 @@ export function ExerciseForm() {
           className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
         />
       </label>
-      <label className="text-sm md:col-span-2">
+      <label className="min-w-0 text-sm sm:col-span-2">
         <span className="mb-1.5 block text-ga-muted">Points de vigilance</span>
         <textarea
           name="vigilance_points"
@@ -113,11 +126,11 @@ export function ExerciseForm() {
         />
       </label>
       {uploadError || state.error ? (
-        <p className="text-sm text-ga-red md:col-span-2">
+        <p className="text-sm text-ga-red sm:col-span-2 xl:col-span-3">
           {uploadError ?? state.error}
         </p>
       ) : null}
-      <div className="md:col-span-2">
+      <div className="sm:col-span-2 xl:col-span-3">
         <button
           type="submit"
           disabled={busy}

@@ -49,18 +49,27 @@ export async function startSession(sessionId: string) {
     .order("sort_order");
 
   for (const item of items ?? []) {
-    const { data: existing } = await supabase
+    const { data: existingSets } = await supabase
       .from("set_logs")
-      .select("id")
+      .select("set_number")
       .eq("session_exercise_id", item.id)
-      .eq("athlete_id", owned.athlete.id)
-      .limit(1);
-    if (existing && existing.length > 0) continue;
+      .eq("athlete_id", owned.athlete.id);
 
-    const rows = Array.from({ length: item.sets_count }, (_, index) => ({
+    const existingNumbers = new Set(
+      (existingSets ?? []).map((set) => set.set_number),
+    );
+
+    const missingNumbers = Array.from(
+      { length: item.sets_count },
+      (_, index) => index + 1,
+    ).filter((setNumber) => !existingNumbers.has(setNumber));
+
+    if (missingNumbers.length === 0) continue;
+
+    const rows = missingNumbers.map((setNumber) => ({
       session_exercise_id: item.id,
       athlete_id: owned.athlete.id,
-      set_number: index + 1,
+      set_number: setNumber,
       weight_kg: item.target_weight_kg,
       reps: item.target_reps,
       completed: false,

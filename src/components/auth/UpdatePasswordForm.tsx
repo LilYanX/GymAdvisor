@@ -6,11 +6,13 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/icons";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { useLoadingActive } from "@/components/layout/LoadingProvider";
 
 export function UpdatePasswordForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  useLoadingActive(pending);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -32,9 +34,9 @@ export function UpdatePasswordForm() {
     setPending(true);
     const supabase = createClient();
     const { error: updateError } = await supabase.auth.updateUser({ password });
-    setPending(false);
 
     if (updateError) {
+      setPending(false);
       setError(updateError.message);
       return;
     }
