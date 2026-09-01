@@ -6,10 +6,10 @@ import { useRouter } from "next/navigation";
 import {
   archiveAthlete,
   deleteAthlete,
-  setPaymentStatus,
   updateAthlete,
   type AthleteFormState,
 } from "@/lib/actions/athletes";
+import { setPaymentStatus } from "@/lib/actions/payments";
 import type { AthleteFollowUp } from "@/lib/athlete-followup-types";
 import { formatDayMonth, formatFeedbackDate } from "@/lib/dates";
 import { PAYMENT_DISPLAY_LABELS } from "@/lib/payments";

@@ -345,5 +345,3 @@ export async function deleteAthlete(
   revalidatePath("/paiements");
   return { error: null };
 }
-
-export { setPaymentStatus } from "@/lib/actions/payments";
