@@ -5,19 +5,19 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { EditorData, EditorSession, EditorSessionExercise, EditorWeek } from "@/lib/editor-types";
 import {
-  addExerciseToSession,
-  addSession,
-  deleteSession,
+  addExerciseToSessionLocal,
+  addSessionLocal,
+  deleteSessionLocal,
+  linkSupersetWithPreviousLocal,
+  moveSessionExerciseLocal,
+  removeSessionExerciseLocal,
+  serializeWeekForSync,
+  unlinkFromSupersetLocal,
+} from "@/lib/editor-draft";
+import {
   ensureDraftWeek,
-  fetchEditorWeek,
-  linkSupersetWithPrevious,
-  moveSessionExercise,
   publishWeek,
-  removeSessionExercise,
-  saveWeekDraft,
-  unlinkFromSuperset,
-  updateSessionExercise,
-  type WeekDraftPayload,
+  syncWeekDraft,
 } from "@/lib/actions/program";
 import {
   formatRest,
@@ -118,31 +118,17 @@ function patchSessionInWeek(
   };
 }
 
-function serializeWeekDraft(week: EditorWeek): WeekDraftPayload {
-  return {
-    sessions: week.sessions.map((session) => ({
-      id: session.id,
-      title: session.title,
-      session_type: session.session_type,
-      rest_details: session.rest_details,
-      session_exercises: session.session_exercises.map((exercise) => ({
-        id: exercise.id,
-        sets_count: exercise.sets_count,
-        target_reps: exercise.target_reps,
-        target_weight_kg: exercise.target_weight_kg,
-        target_percent: exercise.target_percent,
-        target_rpe: exercise.target_rpe,
-        rest_seconds: exercise.rest_seconds,
-        coach_note: exercise.coach_note,
-      })),
-    })),
-  };
+function editorWeekStatusLabel(week: EditorWeek, dirty: boolean): string {
+  if (dirty) return "Brouillon";
+  if (week.status === "published") return "À jour";
+  return "Non publiée";
 }
 
 export function ProgramEditor({ data }: { data: EditorData }) {
   const router = useRouter();
   const { setLoading } = useLoading();
-  const [pending, startTransition] = useTransition();
+  const [creatingWeek, startCreateWeek] = useTransition();
+  const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     data.week?.sessions[0]?.id ?? null,
@@ -183,7 +169,7 @@ export function ProgramEditor({ data }: { data: EditorData }) {
 
   function patchExercise(
     exerciseId: string,
-    patch: Parameters<typeof updateSessionExercise>[1],
+    patch: Partial<EditorSessionExercise>,
   ) {
     setDraftWeek((current) => {
       if (!current) return current;
@@ -200,79 +186,46 @@ export function ProgramEditor({ data }: { data: EditorData }) {
     setDirty(true);
   }
 
-  async function ensureDraftSaved(currentWeek: EditorWeek) {
-    if (!dirty) return { error: null as string | null };
-    return saveWeekDraft(currentWeek.id, serializeWeekDraft(currentWeek));
-  }
-
-  async function reloadWeek(weekId: string) {
-    const result = await fetchEditorWeek(weekId);
-    if (result.error) return { error: result.error };
-    if (result.week) setDraftWeek(result.week);
-    setDirty(false);
-    return { error: null };
-  }
-
-  function run(action: () => Promise<{ error: string | null }>) {
+  function applyWeek(nextWeek: EditorWeek) {
+    setDraftWeek(nextWeek);
+    setDirty(true);
     setError(null);
-    setLoading(true);
-    startTransition(async () => {
-      const currentWeek = draftWeek ?? week;
-      if (!currentWeek) {
-        setLoading(false);
-        return;
-      }
-
-      const saved = await ensureDraftSaved(currentWeek);
-      if (saved.error) {
-        setError(saved.error);
-        setLoading(false);
-        return;
-      }
-      setDirty(false);
-
-      const result = await action();
-      if (result.error) {
-        setError(result.error);
-        setLoading(false);
-        return;
-      }
-
-      const reloaded = await reloadWeek(currentWeek.id);
-      if (reloaded.error) setError(reloaded.error);
-      else router.refresh();
-      setLoading(false);
-    });
   }
 
   function publish() {
+    const currentWeek = draftWeek ?? week;
+    if (!currentWeek) return;
+
     setError(null);
+    setPublishing(true);
     setLoading(true);
-    startTransition(async () => {
-      const currentWeek = draftWeek ?? week;
-      if (!currentWeek) {
-        setLoading(false);
-        return;
-      }
+    void (async () => {
+      try {
+        const synced = await syncWeekDraft(
+          currentWeek.id,
+          serializeWeekForSync(currentWeek),
+        );
+        if (synced.error) {
+          setError(synced.error);
+          return;
+        }
 
-      const saved = await saveWeekDraft(currentWeek.id, serializeWeekDraft(currentWeek));
-      if (saved.error) {
-        setError(saved.error);
-        setLoading(false);
-        return;
-      }
+        const published = await publishWeek(currentWeek.id);
+        if (published.error) {
+          setError(published.error);
+          return;
+        }
 
-      const published = await publishWeek(currentWeek.id);
-      if (published.error) {
-        setError(published.error);
+        setDirty(false);
+        setDraftWeek((current) =>
+          current ? { ...current, status: "published" } : current,
+        );
+        router.refresh();
+      } finally {
+        setPublishing(false);
         setLoading(false);
-        return;
       }
-
-      setDirty(false);
-      router.refresh();
-      setLoading(false);
-    });
+    })();
   }
 
   function handleDropAt(
@@ -289,12 +242,29 @@ export function ProgramEditor({ data }: { data: EditorData }) {
     const sessionExerciseId = event.dataTransfer.getData(SESSION_DRAG);
 
     if (libraryExerciseId) {
-      run(() => addExerciseToSession(sessionId, libraryExerciseId, beforeExerciseId));
+      const currentWeek = draftWeek ?? week;
+      const exercise = data.exercises.find((item) => item.id === libraryExerciseId);
+      if (!currentWeek || !exercise) return;
+      applyWeek(
+        addExerciseToSessionLocal(
+          currentWeek,
+          sessionId,
+          exercise,
+          beforeExerciseId,
+        ),
+      );
       return;
     }
     if (sessionExerciseId) {
-      run(() =>
-        moveSessionExercise(sessionExerciseId, sessionId, beforeExerciseId),
+      const currentWeek = draftWeek ?? week;
+      if (!currentWeek) return;
+      applyWeek(
+        moveSessionExerciseLocal(
+          currentWeek,
+          sessionExerciseId,
+          sessionId,
+          beforeExerciseId,
+        ),
       );
     }
   }
@@ -334,11 +304,7 @@ export function ProgramEditor({ data }: { data: EditorData }) {
           </h1>
           <p className="mt-1 text-sm text-ga-muted">
             {editorWeek
-              ? editorWeek.status === "published" && !dirty
-                ? "Publiée"
-                : dirty
-                  ? "Brouillon · modifications non publiées"
-                  : "Brouillon"
+              ? editorWeekStatusLabel(editorWeek, dirty)
               : "Cette semaine n’existe pas encore."}
           </p>
         </div>
@@ -362,10 +328,10 @@ export function ProgramEditor({ data }: { data: EditorData }) {
         <div className="flex flex-1 items-center justify-center p-10">
           <button
             type="button"
-            disabled={pending}
+            disabled={creatingWeek}
             onClick={() => {
               setError(null);
-              startTransition(async () => {
+              startCreateWeek(async () => {
                 const result = await ensureDraftWeek(
                   data.athlete.id,
                   data.weekNumber,
@@ -415,8 +381,8 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                     <button
                       key={exercise.id}
                       type="button"
-                      draggable={!pending}
-                      disabled={pending}
+                      draggable={!publishing}
+                      disabled={publishing}
                       title="Glisser-déposer sur un jour ou cliquer pour ajouter au jour sélectionné"
                       onDragStart={(event) => {
                         event.dataTransfer.setData(LIBRARY_DRAG, exercise.id);
@@ -428,10 +394,16 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                       }}
                       onClick={() => {
                         if (!selectedSessionId) return;
+                        const currentWeek = draftWeek ?? week;
+                        if (!currentWeek) return;
                         setDropTarget(null);
                         setDragOverSessionId(null);
-                        run(() =>
-                          addExerciseToSession(selectedSessionId, exercise.id),
+                        applyWeek(
+                          addExerciseToSessionLocal(
+                            currentWeek,
+                            selectedSessionId,
+                            exercise,
+                          ),
                         );
                       }}
                       className="cursor-grab rounded-lg border border-ga-border bg-ga-card p-2 text-left hover:border-ga-lime active:cursor-grabbing disabled:opacity-50"
@@ -513,9 +485,14 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                     />
                     <button
                       type="button"
-                      onClick={() =>
-                        run(() => deleteSession(session.id))
-                      }
+                      onClick={() => {
+                        const currentWeek = draftWeek ?? week;
+                        if (!currentWeek) return;
+                        applyWeek(deleteSessionLocal(currentWeek, session.id));
+                        if (selectedSessionId === session.id) {
+                          setSelectedSessionId(null);
+                        }
+                      }}
                       className="text-ga-muted hover:text-ga-red"
                       title="Supprimer le jour"
                     >
@@ -567,10 +544,10 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                                 key={item.id}
                                 item={item}
                                 expanded={expandedId === item.id}
-                                pending={pending}
+                                pending={publishing}
                                 inSuperset
                                 canLinkSuperset={false}
-                                draggable={!pending && expandedId !== item.id}
+                                draggable={!publishing && expandedId !== item.id}
                                 onDragEnd={() => {
                                   setDragOverSessionId(null);
                                   setDropTarget(null);
@@ -581,15 +558,27 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                                   )
                                 }
                                 onSave={(patch) => patchExercise(item.id, patch)}
-                                onRemove={() =>
-                                  run(() => removeSessionExercise(item.id))
-                                }
-                                onLinkSuperset={() =>
-                                  run(() => linkSupersetWithPrevious(item.id))
-                                }
-                                onUnlinkSuperset={() =>
-                                  run(() => unlinkFromSuperset(item.id))
-                                }
+                                onRemove={() => {
+                                  const currentWeek = draftWeek ?? week;
+                                  if (!currentWeek) return;
+                                  applyWeek(
+                                    removeSessionExerciseLocal(currentWeek, item.id),
+                                  );
+                                }}
+                                onLinkSuperset={() => {
+                                  const currentWeek = draftWeek ?? week;
+                                  if (!currentWeek) return;
+                                  applyWeek(
+                                    linkSupersetWithPreviousLocal(currentWeek, item.id),
+                                  );
+                                }}
+                                onUnlinkSuperset={() => {
+                                  const currentWeek = draftWeek ?? week;
+                                  if (!currentWeek) return;
+                                  applyWeek(
+                                    unlinkFromSupersetLocal(currentWeek, item.id),
+                                  );
+                                }}
                               />
                             ))}
                           </div>
@@ -598,10 +587,10 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                         <ExerciseBlock
                           item={group.item}
                           expanded={expandedId === group.item.id}
-                          pending={pending}
+                          pending={publishing}
                           inSuperset={false}
                           canLinkSuperset={group.index > 0}
-                          draggable={!pending && expandedId !== group.item.id}
+                          draggable={!publishing && expandedId !== group.item.id}
                           onDragEnd={() => {
                             setDragOverSessionId(null);
                             setDropTarget(null);
@@ -612,15 +601,30 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                             )
                           }
                           onSave={(patch) => patchExercise(group.item.id, patch)}
-                          onRemove={() =>
-                            run(() => removeSessionExercise(group.item.id))
-                          }
-                          onLinkSuperset={() =>
-                            run(() => linkSupersetWithPrevious(group.item.id))
-                          }
-                          onUnlinkSuperset={() =>
-                            run(() => unlinkFromSuperset(group.item.id))
-                          }
+                          onRemove={() => {
+                            const currentWeek = draftWeek ?? week;
+                            if (!currentWeek) return;
+                            applyWeek(
+                              removeSessionExerciseLocal(currentWeek, group.item.id),
+                            );
+                          }}
+                          onLinkSuperset={() => {
+                            const currentWeek = draftWeek ?? week;
+                            if (!currentWeek) return;
+                            applyWeek(
+                              linkSupersetWithPreviousLocal(
+                                currentWeek,
+                                group.item.id,
+                              ),
+                            );
+                          }}
+                          onUnlinkSuperset={() => {
+                            const currentWeek = draftWeek ?? week;
+                            if (!currentWeek) return;
+                            applyWeek(
+                              unlinkFromSupersetLocal(currentWeek, group.item.id),
+                            );
+                          }}
                         />
                       )}
                       </div>
@@ -646,12 +650,22 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                     <button
                       key={day.value}
                       type="button"
-                      disabled={pending}
-                      onClick={() =>
-                        run(() =>
-                          addSession(editorWeek.id, day.value, day.label),
-                        )
-                      }
+                      disabled={publishing}
+                      onClick={() => {
+                        const currentWeek = draftWeek ?? week;
+                        if (!currentWeek) return;
+                        const nextWeek = addSessionLocal(
+                          currentWeek,
+                          day.value,
+                          day.label,
+                        );
+                        applyWeek(nextWeek);
+                        setSelectedSessionId(
+                          nextWeek.sessions.find(
+                            (session) => session.weekday === day.value,
+                          )?.id ?? null,
+                        );
+                      }}
                       className="flex items-center gap-2 rounded-lg bg-ga-elevated px-3 py-2 text-sm text-ga-muted hover:text-ga-fg disabled:opacity-50"
                     >
                       <IconPlus className="h-4 w-4" />
@@ -672,18 +686,14 @@ export function ProgramEditor({ data }: { data: EditorData }) {
             <p className="text-sm text-ga-muted">
               {error ? (
                 <span className="text-ga-red">{error}</span>
-              ) : dirty ? (
-                "Modifications non publiées"
-              ) : editorWeek.status === "published" ? (
-                "Publiée"
               ) : (
-                "Brouillon"
+                editorWeekStatusLabel(editorWeek, dirty)
               )}
-              {pending ? " · Chargement…" : ""}
+              {publishing ? " · Publication…" : ""}
             </p>
             <button
               type="button"
-              disabled={pending}
+              disabled={publishing}
               onClick={publish}
               className="rounded-lg bg-ga-lime px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
             >
@@ -741,7 +751,7 @@ function ExerciseBlock({
   draggable?: boolean;
   onDragEnd?: () => void;
   onToggle: () => void;
-  onSave: (patch: Parameters<typeof updateSessionExercise>[1]) => void;
+  onSave: (patch: Partial<EditorSessionExercise>) => void;
   onRemove: () => void;
   onLinkSuperset: () => void;
   onUnlinkSuperset: () => void;

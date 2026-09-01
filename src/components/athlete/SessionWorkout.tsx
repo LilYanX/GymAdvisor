@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AthleteExercise, AthleteSessionView } from "@/lib/athlete-types";
 import {
   completeSession,
-  saveExerciseFeedback,
-  saveSetLog,
+  saveWorkoutDrafts,
 } from "@/lib/actions/session";
 import { ExerciseMedia } from "@/components/media/ExerciseMedia";
 import { FixedBottomBar } from "@/components/layout/FixedBottomBar";
@@ -18,6 +17,19 @@ import {
   type WorkoutGroup,
 } from "@/lib/workout-groups";
 
+type SetDraft = {
+  set_number: number;
+  weight_kg: number | null;
+  reps: number | null;
+  completed: boolean;
+};
+
+type ExerciseDraft = {
+  sets: SetDraft[];
+  rpe: number | null;
+  comment: string;
+};
+
 function prescription(item: AthleteExercise): string {
   const parts = [`${item.sets_count} × ${item.target_reps}`];
   if (item.target_weight_kg != null) parts.push(`vise ${item.target_weight_kg} kg`);
@@ -26,19 +38,51 @@ function prescription(item: AthleteExercise): string {
   return parts.join(", ");
 }
 
+function buildDraft(item: AthleteExercise): ExerciseDraft {
+  return {
+    sets: resolveExerciseSets(item).map((set) => ({
+      set_number: set.set_number,
+      weight_kg: set.weight_kg,
+      reps: set.reps,
+      completed: set.completed,
+    })),
+    rpe: item.log?.rpe ?? null,
+    comment: item.log?.comment ?? "",
+  };
+}
+
+function buildAllDrafts(
+  exercises: AthleteExercise[],
+): Record<string, ExerciseDraft> {
+  return Object.fromEntries(exercises.map((item) => [item.id, buildDraft(item)]));
+}
+
 function ExercisePanel({
   item,
+  draft,
+  onDraftChange,
   compact,
-  pending,
-  run,
+  disabled,
 }: {
   item: AthleteExercise;
+  draft: ExerciseDraft;
+  onDraftChange: (draft: ExerciseDraft) => void;
   compact?: boolean;
-  pending: boolean;
-  run: (action: () => Promise<{ error: string | null }>) => void;
+  disabled: boolean;
 }) {
-  const sets = resolveExerciseSets(item);
   const videoUrl = item.exercise?.video_url;
+
+  function updateSet(
+    setNumber: number,
+    patch: Partial<Pick<SetDraft, "weight_kg" | "reps" | "completed">>,
+  ) {
+    onDraftChange({
+      ...draft,
+      sets: draft.sets.map((set) =>
+        set.set_number === setNumber ? { ...set, ...patch } : set,
+      ),
+    });
+  }
 
   return (
     <section
@@ -76,7 +120,7 @@ function ExercisePanel({
           <span className="text-center">Fait</span>
         </div>
         <div className="mt-2 flex flex-col gap-2">
-          {sets.map((set) => (
+          {draft.sets.map((set) => (
             <div
               key={set.set_number}
               className="grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)_2.25rem] items-center gap-x-2"
@@ -86,56 +130,32 @@ function ExercisePanel({
                 type="number"
                 inputMode="decimal"
                 step="0.5"
-                defaultValue={set.weight_kg ?? ""}
-                disabled={pending}
-                onBlur={(event) => {
+                value={set.weight_kg ?? ""}
+                disabled={disabled}
+                onChange={(event) => {
                   const weightKg =
                     event.target.value === "" ? null : Number(event.target.value);
-                  run(() =>
-                    saveSetLog({
-                      sessionExerciseId: item.id,
-                      setNumber: set.set_number,
-                      weightKg,
-                      reps: set.reps,
-                      completed: set.completed,
-                    }),
-                  );
+                  updateSet(set.set_number, { weight_kg: weightKg });
                 }}
                 className="min-w-0 w-full max-w-full rounded-lg border border-ga-border bg-ga-elevated px-2 py-2 text-sm outline-none focus:border-ga-lime"
               />
               <input
                 type="number"
                 inputMode="numeric"
-                defaultValue={set.reps ?? ""}
-                disabled={pending}
-                onBlur={(event) => {
+                value={set.reps ?? ""}
+                disabled={disabled}
+                onChange={(event) => {
                   const reps =
                     event.target.value === "" ? null : Number(event.target.value);
-                  run(() =>
-                    saveSetLog({
-                      sessionExerciseId: item.id,
-                      setNumber: set.set_number,
-                      weightKg: set.weight_kg,
-                      reps,
-                      completed: set.completed,
-                    }),
-                  );
+                  updateSet(set.set_number, { reps });
                 }}
                 className="min-w-0 w-full max-w-full rounded-lg border border-ga-border bg-ga-elevated px-2 py-2 text-sm outline-none focus:border-ga-lime"
               />
               <button
                 type="button"
-                disabled={pending}
+                disabled={disabled}
                 onClick={() =>
-                  run(() =>
-                    saveSetLog({
-                      sessionExerciseId: item.id,
-                      setNumber: set.set_number,
-                      weightKg: set.weight_kg,
-                      reps: set.reps,
-                      completed: !set.completed,
-                    }),
-                  )
+                  updateSet(set.set_number, { completed: !set.completed })
                 }
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${
                   set.completed
@@ -157,18 +177,10 @@ function ExercisePanel({
             <button
               key={value}
               type="button"
-              disabled={pending}
-              onClick={() =>
-                run(() =>
-                  saveExerciseFeedback({
-                    sessionExerciseId: item.id,
-                    rpe: value,
-                    comment: item.log?.comment ?? "",
-                  }),
-                )
-              }
+              disabled={disabled}
+              onClick={() => onDraftChange({ ...draft, rpe: value })}
               className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${
-                item.log?.rpe === value
+                draft.rpe === value
                   ? "bg-ga-lime font-semibold text-black"
                   : "bg-ga-elevated text-ga-muted"
               }`}
@@ -182,21 +194,11 @@ function ExercisePanel({
       <label className="mt-4 block text-sm text-ga-muted">
         Commentaire
         <textarea
-          defaultValue={item.log?.comment ?? ""}
-          key={item.id}
-          disabled={pending}
-          onBlur={(event) => {
-            const comment = event.target.value;
-            if (comment !== (item.log?.comment ?? "")) {
-              run(() =>
-                saveExerciseFeedback({
-                  sessionExerciseId: item.id,
-                  rpe: item.log?.rpe ?? null,
-                  comment,
-                }),
-              );
-            }
-          }}
+          value={draft.comment}
+          disabled={disabled}
+          onChange={(event) =>
+            onDraftChange({ ...draft, comment: event.target.value })
+          }
           rows={2}
           className="mt-2 w-full rounded-xl border border-ga-border bg-ga-elevated px-3 py-2 text-sm text-ga-fg outline-none focus:border-ga-lime"
         />
@@ -207,28 +209,38 @@ function ExercisePanel({
 
 function GroupContent({
   group,
-  pending,
-  run,
+  drafts,
+  onDraftChange,
+  disabled,
 }: {
   group: WorkoutGroup;
-  pending: boolean;
-  run: (action: () => Promise<{ error: string | null }>) => void;
+  drafts: Record<string, ExerciseDraft>;
+  onDraftChange: (exerciseId: string, draft: ExerciseDraft) => void;
+  disabled: boolean;
 }) {
   if (group.kind === "single") {
-    return <ExercisePanel item={group.item} pending={pending} run={run} />;
+    return (
+      <ExercisePanel
+        item={group.item}
+        draft={drafts[group.item.id]}
+        onDraftChange={(draft) => onDraftChange(group.item.id, draft)}
+        disabled={disabled}
+      />
+    );
   }
 
   return (
     <div className="space-y-4">
       {group.items.map((item) => (
-          <ExercisePanel
-            key={item.id}
-            item={item}
-            compact
-            pending={pending}
-            run={run}
-          />
-        ))}
+        <ExercisePanel
+          key={item.id}
+          item={item}
+          draft={drafts[item.id]}
+          onDraftChange={(draft) => onDraftChange(item.id, draft)}
+          compact
+          disabled={disabled}
+        />
+      ))}
     </div>
   );
 }
@@ -248,7 +260,7 @@ export function SessionWorkout({
   const [index, setIndex] = useState(
     Math.min(Math.max(startIndex, 0), Math.max(groups.length - 1, 0)),
   );
-  const [pending, startTransition] = useTransition();
+  const [drafts, setDrafts] = useState(() => buildAllDrafts(session.exercises));
   const [advancing, setAdvancing] = useState(false);
   useLoadingActive(advancing);
   const [error, setError] = useState<string | null>(null);
@@ -264,49 +276,58 @@ export function SessionWorkout({
     );
   }
 
-  function run(action: () => Promise<{ error: string | null }>) {
+  function updateDraft(exerciseId: string, draft: ExerciseDraft) {
+    setDrafts((current) => ({ ...current, [exerciseId]: draft }));
+  }
+
+  function goPrevious() {
+    if (index <= 0 || advancing) return;
     setError(null);
-    startTransition(async () => {
-      const result = await action();
-      if (result.error) setError(result.error);
-      else router.refresh();
-    });
+    setIndex(index - 1);
   }
 
   async function goNext() {
     setError(null);
     setAdvancing(true);
-    startTransition(async () => {
-      try {
-        for (const exercise of workoutGroupItems(group)) {
-          const result = await saveExerciseFeedback({
+    try {
+      const exercises = workoutGroupItems(group);
+      const result = await saveWorkoutDrafts(
+        exercises.map((exercise) => {
+          const draft = drafts[exercise.id];
+          return {
             sessionExerciseId: exercise.id,
-            rpe: exercise.log?.rpe ?? null,
-            comment: exercise.log?.comment ?? "",
-          });
-          if (result.error) {
-            setError(result.error);
-            return;
-          }
-        }
+            sets: draft.sets.map((set) => ({
+              setNumber: set.set_number,
+              weightKg: set.weight_kg,
+              reps: set.reps,
+              completed: set.completed,
+            })),
+            rpe: draft.rpe,
+            comment: draft.comment,
+          };
+        }),
+      );
 
-        if (index + 1 >= total) {
-          const done = await completeSession(session.id);
-          if (done.error) {
-            setError(done.error);
-            return;
-          }
-          router.push("/app");
-          router.refresh();
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+
+      if (index + 1 >= total) {
+        const done = await completeSession(session.id);
+        if (done.error) {
+          setError(done.error);
           return;
         }
-
-        setIndex(index + 1);
+        router.push("/app");
         router.refresh();
-      } finally {
-        setAdvancing(false);
+        return;
       }
-    });
+
+      setIndex(index + 1);
+    } finally {
+      setAdvancing(false);
+    }
   }
 
   const stepLabel =
@@ -339,21 +360,38 @@ export function SessionWorkout({
         </div>
 
         <div className="mt-4">
-          <GroupContent group={group} pending={pending} run={run} />
+          <GroupContent
+            group={group}
+            drafts={drafts}
+            onDraftChange={updateDraft}
+            disabled={advancing}
+          />
         </div>
 
         {error ? <p className="mt-3 text-sm text-ga-red">{error}</p> : null}
       </div>
 
       <FixedBottomBar offsetClass="bottom-14" variant="athlete">
-        <button
-          type="button"
-          disabled={advancing}
-          onClick={goNext}
-          className="w-full rounded-xl bg-ga-lime py-3 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
-        >
-          {index + 1 >= total ? "Terminer la séance" : "Exercice suivant"}
-        </button>
+        <div className={`flex gap-2 ${index > 0 ? "" : ""}`}>
+          {index > 0 ? (
+            <button
+              type="button"
+              disabled={advancing}
+              onClick={goPrevious}
+              className="shrink-0 rounded-xl border border-ga-border bg-ga-elevated px-4 py-3 text-sm font-medium text-ga-fg hover:border-ga-lime disabled:opacity-60"
+            >
+              Précédent
+            </button>
+          ) : null}
+          <button
+            type="button"
+            disabled={advancing}
+            onClick={goNext}
+            className="min-w-0 flex-1 rounded-xl bg-ga-lime py-3 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
+          >
+            {index + 1 >= total ? "Terminer la séance" : "Exercice suivant"}
+          </button>
+        </div>
       </FixedBottomBar>
     </>
   );

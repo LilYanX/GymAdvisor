@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireCoach } from "@/lib/auth";
 import { addDaysISO, mondayOfWeekISO } from "@/lib/dates";
+import { isLocalId, type WeekSyncPayload } from "@/lib/editor-draft";
 import { createClient } from "@/lib/supabase/server";
 import type { SessionType } from "@/lib/supabase/models";
 
@@ -341,6 +342,169 @@ export type WeekDraftPayload = {
     }>;
   }>;
 };
+
+export async function syncWeekDraft(weekId: string, payload: WeekSyncPayload) {
+  const { profile } = await requireCoach();
+  const supabase = await createClient();
+
+  const { data: week } = await supabase
+    .from("program_weeks")
+    .select("athlete_id")
+    .eq("id", weekId)
+    .maybeSingle();
+  if (!week) return { error: "Semaine introuvable." };
+
+  const owned = await getOwnedAthlete(week.athlete_id);
+  if (owned.error) return { error: owned.error };
+
+  const { data: existingSessions } = await supabase
+    .from("sessions")
+    .select("id")
+    .eq("program_week_id", weekId);
+
+  const keptSessionIds = new Set(
+    payload.sessions.filter((session) => !isLocalId(session.id)).map((session) => session.id),
+  );
+
+  for (const session of existingSessions ?? []) {
+    if (!keptSessionIds.has(session.id)) {
+      const { error } = await supabase.from("sessions").delete().eq("id", session.id);
+      if (error) return { error: error.message };
+    }
+  }
+
+  const sessionIdMap = new Map<string, string>();
+
+  for (const session of payload.sessions) {
+    if (isLocalId(session.id)) {
+      const { data, error } = await supabase
+        .from("sessions")
+        .insert({
+          program_week_id: weekId,
+          weekday: session.weekday,
+          title: session.title.trim() || session.title,
+          session_type: session.session_type,
+          rest_details: session.rest_details ?? "",
+          sort_order: session.weekday,
+        })
+        .select("id")
+        .single();
+      if (error || !data) return { error: error?.message ?? "Impossible de créer le jour." };
+      sessionIdMap.set(session.id, data.id);
+    } else {
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          weekday: session.weekday,
+          title: session.title.trim() || session.title,
+          session_type: session.session_type,
+          rest_details: session.rest_details ?? "",
+          sort_order: session.weekday,
+        })
+        .eq("id", session.id);
+      if (error) return { error: error.message };
+      sessionIdMap.set(session.id, session.id);
+    }
+  }
+
+  const realSessionIds = [...sessionIdMap.values()];
+  const { data: existingExercises } = realSessionIds.length
+    ? await supabase
+        .from("session_exercises")
+        .select("id, session_id")
+        .in("session_id", realSessionIds)
+    : { data: [] };
+
+  const keptExerciseIds = new Set(
+    payload.sessions.flatMap((session) =>
+      session.session_exercises
+        .filter((exercise) => !isLocalId(exercise.id))
+        .map((exercise) => exercise.id),
+    ),
+  );
+
+  for (const exercise of existingExercises ?? []) {
+    if (!keptExerciseIds.has(exercise.id)) {
+      const { error } = await supabase
+        .from("session_exercises")
+        .delete()
+        .eq("id", exercise.id);
+      if (error) return { error: error.message };
+    }
+  }
+
+  const groupIdMap = new Map<string, string>();
+  const tempOffset = 100_000;
+
+  for (const session of payload.sessions) {
+    const realSessionId = sessionIdMap.get(session.id);
+    if (!realSessionId) continue;
+
+    for (let index = 0; index < session.session_exercises.length; index += 1) {
+      const exercise = session.session_exercises[index];
+      let supersetGroupId = exercise.superset_group_id;
+      if (supersetGroupId) {
+        if (isLocalId(supersetGroupId)) {
+          if (!groupIdMap.has(supersetGroupId)) {
+            groupIdMap.set(supersetGroupId, crypto.randomUUID());
+          }
+          supersetGroupId = groupIdMap.get(supersetGroupId)!;
+        }
+      }
+
+      const fields = {
+        session_id: realSessionId,
+        exercise_id: exercise.exercise_id,
+        sort_order: tempOffset + index,
+        superset_group_id: supersetGroupId,
+        sets_count: exercise.sets_count,
+        target_reps: exercise.target_reps,
+        target_weight_kg: exercise.target_weight_kg,
+        target_percent: exercise.target_percent,
+        target_rpe: exercise.target_rpe,
+        rest_seconds: exercise.rest_seconds,
+        coach_note: exercise.coach_note,
+      };
+
+      if (isLocalId(exercise.id)) {
+        const { error } = await supabase.from("session_exercises").insert(fields);
+        if (error) return { error: error.message };
+      } else {
+        const { error } = await supabase
+          .from("session_exercises")
+          .update(fields)
+          .eq("id", exercise.id);
+        if (error) return { error: error.message };
+      }
+    }
+
+    const orderedIds = (
+      await supabase
+        .from("session_exercises")
+        .select("id")
+        .eq("session_id", realSessionId)
+        .order("sort_order")
+    ).data?.map((row) => row.id) ?? [];
+
+    for (let index = 0; index < orderedIds.length; index += 1) {
+      const { error } = await supabase
+        .from("session_exercises")
+        .update({ sort_order: index })
+        .eq("id", orderedIds[index]);
+      if (error) return { error: error.message };
+    }
+  }
+
+  const { error: weekError } = await supabase
+    .from("program_weeks")
+    .update({ status: "draft", published_at: null })
+    .eq("id", weekId);
+  if (weekError) return { error: weekError.message };
+
+  void profile;
+  revalidateEditor();
+  return { error: null };
+}
 
 export async function saveWeekDraft(weekId: string, payload: WeekDraftPayload) {
   const { profile } = await requireCoach();

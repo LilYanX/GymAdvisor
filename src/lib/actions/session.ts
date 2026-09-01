@@ -81,6 +81,55 @@ export async function startSession(sessionId: string) {
   return { error: null };
 }
 
+export async function saveWorkoutDrafts(
+  exercises: Array<{
+    sessionExerciseId: string;
+    sets: Array<{
+      setNumber: number;
+      weightKg: number | null;
+      reps: number | null;
+      completed: boolean;
+    }>;
+    rpe: number | null;
+    comment: string;
+  }>,
+) {
+  const owned = await athleteOrError();
+  if (owned.error || !owned.athlete) return { error: owned.error ?? "Erreur." };
+  const supabase = await createClient();
+
+  for (const exercise of exercises) {
+    for (const set of exercise.sets) {
+      const { error } = await supabase.from("set_logs").upsert(
+        {
+          session_exercise_id: exercise.sessionExerciseId,
+          athlete_id: owned.athlete.id,
+          set_number: set.setNumber,
+          weight_kg: set.weightKg,
+          reps: set.reps,
+          completed: set.completed,
+        },
+        { onConflict: "session_exercise_id,set_number" },
+      );
+      if (error) return { error: error.message };
+    }
+
+    const { error: feedbackError } = await supabase.from("session_exercise_logs").upsert(
+      {
+        session_exercise_id: exercise.sessionExerciseId,
+        athlete_id: owned.athlete.id,
+        rpe: exercise.rpe,
+        comment: exercise.comment,
+      },
+      { onConflict: "session_exercise_id" },
+    );
+    if (feedbackError) return { error: feedbackError.message };
+  }
+
+  refresh();
+  return { error: null };
+}
+
 export async function saveSetLog(input: {
   sessionExerciseId: string;
   setNumber: number;
