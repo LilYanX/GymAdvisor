@@ -14,6 +14,17 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "GymAdvisor",
   description: "Suivi de coachings sportifs à distance",
+  applicationName: "GymAdvisor",
+  appleWebApp: {
+    capable: true,
+    title: "GymAdvisor",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
+    shortcut: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({
