@@ -8,10 +8,14 @@ import { ExerciseMedia } from "@/components/media/ExerciseMedia";
 
 const FILTERS: Array<{ id: "all" | MuscleGroup; label: string }> = [
   { id: "all", label: "Tous" },
-  { id: "jambes", label: "Jambes" },
-  { id: "haut_du_corps", label: "Haut du corps" },
-  { id: "gainage", label: "Gainage" },
+  { id: "jambe", label: "Jambe" },
+  { id: "push", label: "Push" },
+  { id: "pull", label: "Pull" },
+  { id: "core", label: "Core" },
   { id: "cardio", label: "Cardio" },
+  { id: "mobilite", label: "Mobilité" },
+  { id: "balistique", label: "Balistique" },
+  { id: "pliometrie", label: "Pliométrie" },
 ];
 
 export function LibraryView({ exercises }: { exercises: Exercise[] }) {
@@ -83,30 +87,24 @@ export function LibraryView({ exercises }: { exercises: Exercise[] }) {
                 key={exercise.id}
                 type="button"
                 onClick={() => setSelectedId(exercise.id)}
-                className={`rounded-xl border bg-ga-card text-left ${
+                className={`rounded-xl border p-3 text-left transition-colors ${
                   selected?.id === exercise.id
-                    ? "border-ga-lime"
-                    : "border-ga-border hover:border-ga-muted"
+                    ? "border-ga-lime bg-ga-card"
+                    : "border-ga-border bg-ga-card hover:border-ga-lime/60"
                 }`}
               >
-                <div className="overflow-hidden rounded-t-xl bg-ga-elevated">
+                <div className="overflow-hidden rounded-lg bg-ga-elevated">
                   <ExerciseMedia
                     url={exercise.video_url}
                     name={exercise.name}
-                    className="h-32 w-full"
-                    controls={false}
-                    playing={false}
+                    className="aspect-video w-full"
+                    playing={selected?.id === exercise.id}
                   />
                 </div>
-                <div className="p-3">
-                  <p className="font-medium">{exercise.name}</p>
-                  <p className="mt-1 text-xs text-ga-muted">
-                    {MUSCLE_GROUP_LABELS[exercise.muscle_group]}
-                    {exercise.cues.length > 0
-                      ? ` · ${exercise.cues.length} consignes`
-                      : ""}
-                  </p>
-                </div>
+                <p className="mt-2 text-sm font-medium">{exercise.name}</p>
+                <p className="mt-0.5 text-xs text-ga-muted">
+                  {MUSCLE_GROUP_LABELS[exercise.muscle_group]}
+                </p>
               </button>
             ))}
           </div>
@@ -114,49 +112,46 @@ export function LibraryView({ exercises }: { exercises: Exercise[] }) {
       </div>
 
       {selected ? (
-        <aside className="flex w-80 shrink-0 flex-col border-l border-ga-border bg-ga-panel">
-          <div className="min-h-0 flex-1 overflow-y-auto p-5">
-            <h2 className="text-lg font-semibold">{selected.name}</h2>
-            <div className="mt-4 overflow-hidden rounded-xl bg-ga-elevated">
+        <aside className="hidden w-96 shrink-0 flex-col border-l border-ga-border bg-ga-panel lg:flex">
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">
+            <div className="overflow-hidden rounded-xl bg-ga-elevated">
               <ExerciseMedia
                 url={selected.video_url}
                 name={selected.name}
-                className="h-40 w-full"
+                className="aspect-video w-full"
                 playing
               />
             </div>
+            <h2 className="mt-4 text-xl font-semibold">{selected.name}</h2>
+            <p className="mt-1 text-sm text-ga-muted">
+              {MUSCLE_GROUP_LABELS[selected.muscle_group]}
+            </p>
             {selected.cues.length > 0 ? (
-              <div className="mt-5">
-                <h3 className="text-sm font-medium">Consigne</h3>
-                <ol className="mt-2 list-decimal space-y-2 pl-4 text-sm text-ga-muted">
-                  {selected.cues.map((cue) => (
-                    <li key={cue}>{cue}</li>
-                  ))}
-                </ol>
-              </div>
+              <ol className="mt-4 list-decimal space-y-1.5 pl-4 text-sm text-ga-muted">
+                {selected.cues.map((cue) => (
+                  <li key={cue}>{cue}</li>
+                ))}
+              </ol>
             ) : null}
             {selected.vigilance_points ? (
-              <div className="mt-5 rounded-lg border border-ga-amber/40 bg-ga-amber/10 p-3 text-sm">
-                <p className="font-medium text-ga-amber">Points de vigilance</p>
-                <p className="mt-1 whitespace-pre-line text-ga-muted">
-                  {selected.vigilance_points.replace(/\s*·\s*/g, "\n")}
-                </p>
-              </div>
+              <p className="mt-4 whitespace-pre-line text-sm text-ga-muted">
+                {selected.vigilance_points}
+              </p>
             ) : null}
-          </div>
-          <div className="flex shrink-0 flex-col gap-2 border-t border-ga-border p-5">
-            <Link
-              href={`/bibliotheque/${selected.id}`}
-              className="flex w-full items-center justify-center rounded-lg border border-ga-border px-4 py-2.5 text-sm font-medium hover:border-ga-lime hover:text-ga-fg"
-            >
-              Modifier
-            </Link>
-            <Link
-              href="/editeur"
-              className="flex w-full items-center justify-center rounded-lg bg-ga-lime px-4 py-2.5 text-sm font-semibold text-black hover:bg-lime-300"
-            >
-              Utiliser dans un programme
-            </Link>
+            <div className="mt-6 flex flex-col gap-2">
+              <Link
+                href={`/bibliotheque/${selected.id}`}
+                className="rounded-lg border border-ga-border px-4 py-2 text-center text-sm hover:border-ga-lime"
+              >
+                Modifier
+              </Link>
+              <Link
+                href="/editeur"
+                className="rounded-lg bg-ga-lime px-4 py-2 text-center text-sm font-semibold text-black hover:bg-lime-300"
+              >
+                Utiliser dans un programme
+              </Link>
+            </div>
           </div>
         </aside>
       ) : null}

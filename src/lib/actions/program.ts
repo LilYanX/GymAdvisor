@@ -129,6 +129,7 @@ async function applySessionExerciseOrder(
   previousSupersetGroupId: string | null,
 ) {
   const crossSession = fromSessionId !== targetSessionId;
+  const tempOffset = 100_000;
 
   for (let index = 0; index < orderedIds.length; index += 1) {
     const id = orderedIds[index];
@@ -136,7 +137,7 @@ async function applySessionExerciseOrder(
       sort_order: number;
       session_id?: string;
       superset_group_id?: null;
-    } = { sort_order: index };
+    } = { sort_order: tempOffset + index };
 
     if (id === movedId && crossSession) {
       patch.session_id = targetSessionId;
@@ -147,6 +148,14 @@ async function applySessionExerciseOrder(
       .from("session_exercises")
       .update(patch)
       .eq("id", id);
+    if (error) return { error: error.message };
+  }
+
+  for (let index = 0; index < orderedIds.length; index += 1) {
+    const { error } = await supabase
+      .from("session_exercises")
+      .update({ sort_order: index })
+      .eq("id", orderedIds[index]);
     if (error) return { error: error.message };
   }
 
@@ -203,16 +212,6 @@ export async function moveSessionExercise(
 
   ordered.splice(insertIndex, 0, sessionExerciseId);
 
-  const unchanged =
-    item.session_id === targetSessionId &&
-    ordered.length === (targetItems?.length ?? 0);
-  if (unchanged) {
-    const previousIndex = (targetItems ?? []).findIndex((row) => row.id === sessionExerciseId);
-    if (previousIndex === insertIndex) {
-      return { error: null };
-    }
-  }
-
   const result = await applySessionExerciseOrder(
     supabase,
     targetSessionId,
@@ -242,12 +241,22 @@ export async function addExerciseToSession(
     .maybeSingle();
   if (!exercise) return { error: "Exercice introuvable." };
 
+  const { data: targetItems } = await supabase
+    .from("session_exercises")
+    .select("sort_order")
+    .eq("session_id", sessionId);
+
+  const maxOrder = (targetItems ?? []).reduce(
+    (max, row) => Math.max(max, row.sort_order),
+    -1,
+  );
+
   const { data: inserted, error } = await supabase
     .from("session_exercises")
     .insert({
       session_id: sessionId,
       exercise_id: exerciseId,
-      sort_order: 9999,
+      sort_order: maxOrder + 1,
       sets_count: 4,
       target_reps: 8,
       rest_seconds: 120,

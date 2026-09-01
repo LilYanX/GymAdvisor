@@ -6,7 +6,6 @@ import { requireCoach } from "@/lib/auth";
 import { firstOfMonthISO } from "@/lib/dates";
 import { createAdminClient, getAppUrl } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import type { PaymentStatus } from "@/lib/supabase/models";
 
 export type AthleteFormState = {
   error: string | null;
@@ -347,36 +346,4 @@ export async function deleteAthlete(
   return { error: null };
 }
 
-export async function setPaymentStatus(
-  athleteId: string,
-  status: PaymentStatus,
-): Promise<{ error: string | null }> {
-  const { profile } = await requireCoach();
-  const supabase = await createClient();
-
-  const { data: athlete } = await supabase
-    .from("athletes")
-    .select("id")
-    .eq("id", athleteId)
-    .eq("coach_id", profile.id)
-    .maybeSingle();
-
-  if (!athlete) return { error: "Sportif introuvable." };
-
-  const periodStart = firstOfMonthISO();
-  const { error } = await supabase.from("payments").upsert(
-    {
-      athlete_id: athleteId,
-      period_start: periodStart,
-      status,
-    },
-    { onConflict: "athlete_id,period_start" },
-  );
-
-  if (error) return { error: error.message };
-
-  revalidatePath("/");
-  revalidatePath(`/sportifs/${athleteId}`);
-  revalidatePath("/paiements");
-  return { error: null };
-}
+export { setPaymentStatus } from "@/lib/actions/payments";

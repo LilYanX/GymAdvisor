@@ -3,6 +3,7 @@ import type {
   CheckIn,
   Payment,
 } from "@/lib/supabase/models";
+import type { PaymentDisplayStatus } from "@/lib/payments";
 
 export type FeedbackItem = {
   sessionId: string;
@@ -33,6 +34,8 @@ export type AthleteFollowUp = {
   athlete: Athlete;
   payment: Payment | null;
   paymentBlocked: boolean;
+  paymentDisplayStatus: PaymentDisplayStatus;
+  overdueMonthLabels: string[];
   paymentDueDate: string;
   paymentGraceEnd: string;
   checkIns: CheckIn[];

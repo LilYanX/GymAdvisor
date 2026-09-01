@@ -1,5 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { firstOfMonthISO, todayISO, addDaysISO } from "@/lib/dates";
+import { firstOfMonthISO, todayISO, addDaysISO, formatPeriodLabel } from "@/lib/dates";
+import {
+  getAthletePaymentState,
+  paymentSettingsFromProfile,
+  paymentWindow,
+} from "@/lib/payments";
 import type {
   Athlete,
   CheckIn,
@@ -25,29 +30,15 @@ export type {
   TonnageSession,
 } from "@/lib/athlete-followup-types";
 
-/** Échéance le 25 du mois, grâce jusqu’au 30 (J+5). */
-export function paymentWindow(isoDate: string = todayISO()): {
-  periodStart: string;
-  dueDate: string;
-  graceEnd: string;
-} {
-  const ym = isoDate.slice(0, 7);
-  return {
-    periodStart: `${ym}-01`,
-    dueDate: `${ym}-25`,
-    graceEnd: `${ym}-30`,
-  };
-}
-
-export function isPaymentBlocked(
-  payment: Payment | null | undefined,
-  today: string = todayISO(),
-): boolean {
-  const { dueDate, graceEnd } = paymentWindow(today);
-  if (today < dueDate) return false;
-  if (payment?.status === "paid") return false;
-  return today > graceEnd;
-}
+export {
+  isPaymentBlocked,
+  paymentWindow,
+  getPaymentDisplayStatus,
+  getAthletePaymentState,
+  paymentSettingsFromProfile,
+  PAYMENT_DISPLAY_LABELS,
+} from "@/lib/payments";
+export type { PaymentDisplayStatus, PaymentSettings } from "@/lib/payments";
 
 export async function getAthleteFollowUp(
   coachId: string,
@@ -55,7 +46,6 @@ export async function getAthleteFollowUp(
 ): Promise<AthleteFollowUp | null> {
   const supabase = await createClient();
   const today = todayISO();
-  const { periodStart, dueDate, graceEnd } = paymentWindow(today);
 
   const { data: athlete } = await supabase
     .from("athletes")
@@ -66,8 +56,17 @@ export async function getAthleteFollowUp(
 
   if (!athlete) return null;
 
+  const { data: coachProfile } = await supabase
+    .from("profiles")
+    .select("payment_due_day, payment_block_after_days")
+    .eq("id", coachId)
+    .maybeSingle();
+
+  const paymentSettings = paymentSettingsFromProfile(coachProfile);
+  const { dueDate, graceEnd } = paymentWindow(today, paymentSettings);
+
   const [
-    { data: payment },
+    { data: athletePayments },
     { data: checkIns },
     { data: weeks },
   ] = await Promise.all([
@@ -75,8 +74,7 @@ export async function getAthleteFollowUp(
       .from("payments")
       .select("*")
       .eq("athlete_id", athleteId)
-      .eq("period_start", periodStart)
-      .maybeSingle(),
+      .order("period_start", { ascending: false }),
     supabase
       .from("check_ins")
       .select("*")
@@ -228,10 +226,15 @@ export async function getAthleteFollowUp(
   );
   totals.loadUnits = Math.round(totals.loadUnits * 10) / 10;
 
+  const payments = (athletePayments ?? []) as Payment[];
+  const paymentState = getAthletePaymentState(payments, today, paymentSettings);
+
   return {
     athlete: athlete as Athlete,
-    payment: (payment as Payment | null) ?? null,
-    paymentBlocked: isPaymentBlocked(payment as Payment | null, today),
+    payment: paymentState.currentPayment,
+    paymentBlocked: paymentState.blocked,
+    paymentDisplayStatus: paymentState.displayStatus,
+    overdueMonthLabels: paymentState.overduePeriods.map(formatPeriodLabel),
     paymentDueDate: dueDate,
     paymentGraceEnd: graceEnd,
     checkIns: (checkIns ?? []) as CheckIn[],

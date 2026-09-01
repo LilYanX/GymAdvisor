@@ -1,11 +1,14 @@
 import type { MuscleGroup, SessionType } from "@/lib/supabase/models";
 
 export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
-  jambes: "Jambes",
-  haut_du_corps: "Haut du corps",
-  gainage: "Gainage",
+  jambe: "Jambe",
+  push: "Push",
+  pull: "Pull",
+  core: "Core",
   cardio: "Cardio",
-  full_body: "Full body",
+  mobilite: "Mobilité",
+  balistique: "Balistique",
+  pliometrie: "Pliométrie",
 };
 
 export const SESSION_TYPE_LABELS: Record<SessionType, string> = {

@@ -16,6 +16,8 @@ export type Database = {
           first_name: string;
           last_name: string;
           email: string | null;
+          payment_due_day: number;
+          payment_block_after_days: number;
           created_at: string;
           updated_at: string;
         };
@@ -25,6 +27,8 @@ export type Database = {
           first_name?: string;
           last_name?: string;
           email?: string | null;
+          payment_due_day?: number;
+          payment_block_after_days?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -34,6 +38,8 @@ export type Database = {
           first_name?: string;
           last_name?: string;
           email?: string | null;
+          payment_due_day?: number;
+          payment_block_after_days?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -599,11 +605,14 @@ export type Database = {
     Enums: {
       user_role: "coach" | "athlete";
       muscle_group:
-        | "jambes"
-        | "haut_du_corps"
-        | "gainage"
+        | "jambe"
+        | "push"
+        | "pull"
+        | "core"
         | "cardio"
-        | "full_body";
+        | "mobilite"
+        | "balistique"
+        | "pliometrie";
       week_status: "draft" | "published";
       session_type: "workout" | "rest" | "optional";
       session_log_status: "not_started" | "in_progress" | "completed" | "skipped";

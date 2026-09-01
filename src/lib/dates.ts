@@ -76,6 +76,16 @@ export function mondayOfWeekISO(isoDate: string = todayISO()): string {
   return addDaysISO(isoDate, 1 - isoWeekday(isoDate));
 }
 
+export function formatPeriodLabel(periodStart: string): string {
+  const [year, month] = periodStart.split("-").map(Number);
+  return capitalize(
+    new Intl.DateTimeFormat("fr-FR", {
+      month: "long",
+      year: "numeric",
+    }).format(new Date(year, month - 1, 1)),
+  );
+}
+
 export function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }

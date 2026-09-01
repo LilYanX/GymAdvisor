@@ -11,7 +11,8 @@ import {
   type AthleteFormState,
 } from "@/lib/actions/athletes";
 import type { AthleteFollowUp } from "@/lib/athlete-followup-types";
-import { formatFeedbackDate } from "@/lib/dates";
+import { formatDayMonth, formatFeedbackDate } from "@/lib/dates";
+import { PAYMENT_DISPLAY_LABELS } from "@/lib/payments";
 
 function monthLabel(): string {
   return new Intl.DateTimeFormat("fr-FR", { month: "long" }).format(new Date());
@@ -178,25 +179,30 @@ export function AthleteDetailView({ data }: { data: AthleteFollowUp }) {
             <h2 className="text-base font-semibold">
               Paiement - {monthLabel()}
             </h2>
-            <p className="mt-1 text-sm text-ga-muted">
-              Échéance le {data.paymentDueDate.slice(8)} · accès bloqué après le{" "}
-              {data.paymentGraceEnd.slice(8)}
-            </p>
             <p className="mt-4 text-sm">
               Statut :{" "}
               <span
-                className={
-                  data.payment?.status === "paid"
-                    ? "font-semibold text-ga-lime"
-                    : "font-semibold text-ga-amber"
-                }
+                className={`font-semibold ${
+                  data.paymentDisplayStatus === "paid"
+                    ? "text-ga-lime"
+                    : data.paymentDisplayStatus === "late"
+                      ? "text-ga-amber"
+                      : data.paymentDisplayStatus === "blocked"
+                        ? "text-ga-red"
+                        : "text-ga-muted"
+                }`}
               >
-                {data.payment?.status === "paid" ? "Payé" : "En attente"}
+                {PAYMENT_DISPLAY_LABELS[data.paymentDisplayStatus]}
               </span>
               {data.paymentBlocked ? (
                 <span className="ml-2 text-ga-red">(accès bloqué)</span>
               ) : null}
             </p>
+            {data.overdueMonthLabels.length > 0 ? (
+              <p className="mt-2 text-sm text-ga-red">
+                Mois impayés : {data.overdueMonthLabels.join(", ")}
+              </p>
+            ) : null}
             {payError ? <p className="mt-2 text-sm text-ga-red">{payError}</p> : null}
             <div className="mt-4 flex gap-2">
               <button
@@ -212,7 +218,7 @@ export function AthleteDetailView({ data }: { data: AthleteFollowUp }) {
                 }}
                 className="rounded-lg bg-ga-lime px-3 py-2 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
               >
-                Marquer payé
+                {data.paymentBlocked ? "Réactiver l'accès" : "Marquer payé"}
               </button>
               <button
                 type="button"

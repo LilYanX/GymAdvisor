@@ -68,7 +68,7 @@ export function ExerciseForm() {
         <select
           name="muscle_group"
           className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
-          defaultValue="jambes"
+          defaultValue="jambe"
         >
           {(Object.keys(MUSCLE_GROUP_LABELS) as MuscleGroup[]).map((group) => (
             <option key={group} value={group}>

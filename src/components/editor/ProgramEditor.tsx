@@ -162,7 +162,7 @@ export function ProgramEditor({ data }: { data: EditorData }) {
   useEffect(() => {
     setDraftWeek(week);
     setDirty(false);
-  }, [week, data.weekNumber, data.athlete.id]);
+  }, [data.weekNumber, data.athlete.id, week?.id]);
 
   useEffect(() => {
     const ids = editorWeek?.sessions.map((session) => session.id) ?? [];
@@ -240,6 +240,7 @@ export function ProgramEditor({ data }: { data: EditorData }) {
 
       const reloaded = await reloadWeek(currentWeek.id);
       if (reloaded.error) setError(reloaded.error);
+      else router.refresh();
       setLoading(false);
     });
   }
@@ -427,6 +428,8 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                       }}
                       onClick={() => {
                         if (!selectedSessionId) return;
+                        setDropTarget(null);
+                        setDragOverSessionId(null);
                         run(() =>
                           addExerciseToSession(selectedSessionId, exercise.id),
                         );

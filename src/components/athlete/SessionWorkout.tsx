@@ -249,7 +249,8 @@ export function SessionWorkout({
     Math.min(Math.max(startIndex, 0), Math.max(groups.length - 1, 0)),
   );
   const [pending, startTransition] = useTransition();
-  useLoadingActive(pending);
+  const [advancing, setAdvancing] = useState(false);
+  useLoadingActive(advancing);
   const [error, setError] = useState<string | null>(null);
 
   const group = groups[index];
@@ -274,32 +275,37 @@ export function SessionWorkout({
 
   async function goNext() {
     setError(null);
+    setAdvancing(true);
     startTransition(async () => {
-      for (const exercise of workoutGroupItems(group)) {
-        const result = await saveExerciseFeedback({
-          sessionExerciseId: exercise.id,
-          rpe: exercise.log?.rpe ?? null,
-          comment: exercise.log?.comment ?? "",
-        });
-        if (result.error) {
-          setError(result.error);
-          return;
+      try {
+        for (const exercise of workoutGroupItems(group)) {
+          const result = await saveExerciseFeedback({
+            sessionExerciseId: exercise.id,
+            rpe: exercise.log?.rpe ?? null,
+            comment: exercise.log?.comment ?? "",
+          });
+          if (result.error) {
+            setError(result.error);
+            return;
+          }
         }
-      }
 
-      if (index + 1 >= total) {
-        const done = await completeSession(session.id);
-        if (done.error) {
-          setError(done.error);
+        if (index + 1 >= total) {
+          const done = await completeSession(session.id);
+          if (done.error) {
+            setError(done.error);
+            return;
+          }
+          router.push("/app");
+          router.refresh();
           return;
         }
-        router.push("/app");
+
+        setIndex(index + 1);
         router.refresh();
-        return;
+      } finally {
+        setAdvancing(false);
       }
-
-      setIndex(index + 1);
-      router.refresh();
     });
   }
 
@@ -342,7 +348,7 @@ export function SessionWorkout({
       <FixedBottomBar offsetClass="bottom-14" variant="athlete">
         <button
           type="button"
-          disabled={pending}
+          disabled={advancing}
           onClick={goNext}
           className="w-full rounded-xl bg-ga-lime py-3 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
         >

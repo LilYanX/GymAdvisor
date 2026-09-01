@@ -11,11 +11,14 @@ export type ExerciseFormState = {
 };
 
 const GROUPS: MuscleGroup[] = [
-  "jambes",
-  "haut_du_corps",
-  "gainage",
+  "jambe",
+  "push",
+  "pull",
+  "core",
   "cardio",
-  "full_body",
+  "mobilite",
+  "balistique",
+  "pliometrie",
 ];
 
 export async function createExercise(
