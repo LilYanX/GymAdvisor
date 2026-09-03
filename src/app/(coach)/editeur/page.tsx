@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { getEditorData } from "@/lib/editor";
+import { listWorkoutTemplates } from "@/lib/actions/templates";
 import { EditorAthletesTable } from "@/components/editor/EditorAthletesTable";
-import { ProgramEditor } from "@/components/editor/ProgramEditor";
+import { EditorWorkspace } from "@/components/editor/EditorWorkspace";
+import type { SavedTemplate } from "@/components/editor/SubProgramEditor";
 
 type Props = {
   searchParams: Promise<{ athlete?: string; week?: string }>;
@@ -30,6 +32,9 @@ export default async function EditorPage({ searchParams }: Props) {
     );
   }
 
+  const templatesResult = await listWorkoutTemplates();
+  const templates = (templatesResult.templates ?? []) as SavedTemplate[];
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <AthleteBar
@@ -37,7 +42,11 @@ export default async function EditorPage({ searchParams }: Props) {
         selectedId={result.data.athlete.id}
         week={result.data.weekNumber}
       />
-      <ProgramEditor data={result.data} />
+      <EditorWorkspace
+        data={result.data}
+        templates={templates}
+        library={result.data.exercises}
+      />
     </div>
   );
 }

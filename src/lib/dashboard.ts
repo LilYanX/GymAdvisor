@@ -11,6 +11,7 @@ import type {
   Payment,
   ProgramWeek,
   Session,
+  SessionCheckIn,
   SessionLog,
 } from "@/lib/supabase/models";
 import type { AthleteStatus } from "@/lib/dashboard-types";
@@ -85,6 +86,7 @@ export async function getDashboardData(coachId: string): Promise<DashboardData> 
     { data: weeksData },
     { data: logsData },
     { data: paymentsData },
+    { data: feelingsData },
   ] = await Promise.all([
     supabase.from("program_weeks").select("*").in("athlete_id", athleteIds),
     supabase.from("session_logs").select("*").in("athlete_id", athleteIds),
@@ -93,11 +95,24 @@ export async function getDashboardData(coachId: string): Promise<DashboardData> 
       .select("*")
       .in("athlete_id", athleteIds)
       .eq("period_start", periodStart),
+    supabase
+      .from("session_check_ins")
+      .select("*")
+      .in("athlete_id", athleteIds)
+      .eq("needs_attention", true)
+      .order("created_at", { ascending: false }),
   ]);
 
   const weeks = (weeksData ?? []) as ProgramWeek[];
   const logs = (logsData ?? []) as SessionLog[];
   const payments = (paymentsData ?? []) as Payment[];
+  const attentionFeelings = (feelingsData ?? []) as SessionCheckIn[];
+  const latestAttentionByAthlete = new Map<string, SessionCheckIn>();
+  for (const feeling of attentionFeelings) {
+    if (!latestAttentionByAthlete.has(feeling.athlete_id)) {
+      latestAttentionByAthlete.set(feeling.athlete_id, feeling);
+    }
+  }
 
   const weekIds = weeks.map((week) => week.id);
   const { data: sessionsData } = weekIds.length
@@ -107,7 +122,15 @@ export async function getDashboardData(coachId: string): Promise<DashboardData> 
   const sessions = (sessionsData ?? []) as Session[];
 
   const rows = athletes.map((athlete) =>
-    buildAthleteRow(athlete, weeks, sessions, logs, payments, today),
+    buildAthleteRow(
+      athlete,
+      weeks,
+      sessions,
+      logs,
+      payments,
+      today,
+      latestAttentionByAthlete.has(athlete.id),
+    ),
   );
 
   const todos: DashboardTodo[] = [];
@@ -119,6 +142,16 @@ export async function getDashboardData(coachId: string): Promise<DashboardData> 
         kind: "late",
         title: `Relancer ${row.firstName}`,
         detail: `Pas de retour depuis ${formatWeekdayLong(row.overdueSince).toLowerCase()}`,
+        href: `/sportifs/${row.id}`,
+      });
+    }
+    if (latestAttentionByAthlete.has(row.id)) {
+      todos.push({
+        id: `feeling-${row.id}`,
+        athleteId: row.id,
+        kind: "feeling",
+        title: `Ressenti bas — ${row.firstName}`,
+        detail: "Énergie, sommeil, motivation ou douleurs à surveiller",
         href: `/sportifs/${row.id}`,
       });
     }
@@ -172,6 +205,7 @@ function buildAthleteRow(
   logs: SessionLog[],
   payments: Payment[],
   today: string,
+  lowFeeling: boolean,
 ): DashboardAthleteRow {
   const pendingPayment = hasPendingPayment(athlete.id, payments);
   const overdue = oldestOverdueDate(athlete, weeks, sessions, logs, today);
@@ -182,6 +216,7 @@ function buildAthleteRow(
   let status: AthleteStatus = "up_to_date";
   if (pendingPayment) status = "payment";
   else if (overdue) status = "late";
+  else if (lowFeeling) status = "feeling";
   else if (prepare || (sessionsLeft > 0 && sessionsLeft <= 2 && total > 0)) {
     status = prepare ? "prepare" : "two_left";
   }

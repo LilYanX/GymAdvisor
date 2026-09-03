@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { AthleteProgram } from "@/lib/athlete-types";
 import { weekdayShort } from "@/lib/labels";
+import { AthleteActivitiesSection } from "@/components/athlete/AthleteActivitiesSection";
 
 function formatTime(value: string | null): string | null {
   if (!value) return null;
@@ -41,7 +42,9 @@ export function AthleteHome({ data }: { data: AthleteProgram }) {
             <span>
               {workout.session_type === "rest"
                 ? "Repos"
-                : `${workout.exercises.length} exercice${workout.exercises.length > 1 ? "s" : ""}`}
+                : workout.session_type === "optional"
+                  ? `Optionnel · ${workout.exercises.length} exercice${workout.exercises.length > 1 ? "s" : ""}`
+                  : `${workout.exercises.length} exercice${workout.exercises.length > 1 ? "s" : ""}`}
             </span>
           </div>
           {today?.kind === "completed" ? null : workout.session_type === "rest" ? (
@@ -97,6 +100,11 @@ export function AthleteHome({ data }: { data: AthleteProgram }) {
           </Link>
         </section>
       ) : null}
+
+      <AthleteActivitiesSection
+        activities={data.activities}
+        defaultDate={data.todayISO}
+      />
     </div>
   );
 }

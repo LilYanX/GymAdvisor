@@ -1,5 +1,6 @@
 import type {
   Athlete,
+  AthleteActivity,
   Exercise,
   ProgramWeek,
   Session,
@@ -35,4 +36,6 @@ export type AthleteProgram = {
   today: AthleteDay | null;
   overdue: AthleteDay | null;
   programJustPublished: boolean;
+  activities: AthleteActivity[];
+  todayISO: string;
 };

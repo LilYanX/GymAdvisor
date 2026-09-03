@@ -7,18 +7,20 @@ import {
 } from "@/lib/payments";
 import type {
   Athlete,
-  CheckIn,
+  AthleteActivity,
+  Exercise,
   Payment,
   Session,
+  SessionCheckIn,
   SessionExercise,
   SessionExerciseLog,
   SessionLog,
   SetLog,
-  Exercise,
 } from "@/lib/supabase/models";
 import type {
   AthleteFollowUp,
   FeedbackItem,
+  SessionFeeling,
   TonnageExercise,
   TonnageSession,
 } from "@/lib/athlete-followup-types";
@@ -67,7 +69,8 @@ export async function getAthleteFollowUp(
 
   const [
     { data: athletePayments },
-    { data: checkIns },
+    { data: sessionFeelingsData },
+    { data: activitiesData },
     { data: weeks },
   ] = await Promise.all([
     supabase
@@ -76,11 +79,17 @@ export async function getAthleteFollowUp(
       .eq("athlete_id", athleteId)
       .order("period_start", { ascending: false }),
     supabase
-      .from("check_ins")
+      .from("session_check_ins")
       .select("*")
       .eq("athlete_id", athleteId)
-      .order("week_start_date", { ascending: false })
-      .limit(8),
+      .order("created_at", { ascending: false })
+      .limit(12),
+    supabase
+      .from("athlete_activities")
+      .select("*")
+      .eq("athlete_id", athleteId)
+      .order("performed_on", { ascending: false })
+      .limit(20),
     supabase
       .from("program_weeks")
       .select("id")
@@ -94,12 +103,45 @@ export async function getAthleteFollowUp(
         .from("sessions")
         .select("*")
         .in("program_week_id", weekIds)
-        .eq("session_type", "workout")
+        .in("session_type", ["workout", "optional"])
         .order("scheduled_date", { ascending: false })
     : { data: [] as Session[] };
 
   const sessions = (sessionsData ?? []) as Session[];
   const sessionIds = sessions.map((session) => session.id);
+  const sessionById = new Map(sessions.map((session) => [session.id, session]));
+
+  const feelings: SessionFeeling[] = (
+    (sessionFeelingsData ?? []) as SessionCheckIn[]
+  ).map((item) => {
+    const session = sessionById.get(item.session_id);
+    return {
+      ...item,
+      sessionTitle: session?.title ?? "Séance",
+      sessionDate: session?.scheduled_date ?? null,
+    };
+  });
+
+  // Enrich titles for check-ins whose sessions weren't in the published workout list
+  const missingFeelingSessionIds = feelings
+    .filter((item) => item.sessionTitle === "Séance")
+    .map((item) => item.session_id);
+  if (missingFeelingSessionIds.length > 0) {
+    const { data: extraSessions } = await supabase
+      .from("sessions")
+      .select("id, title, scheduled_date")
+      .in("id", missingFeelingSessionIds);
+    for (const session of extraSessions ?? []) {
+      sessionById.set(session.id, session as Session);
+    }
+    for (const feeling of feelings) {
+      const session = sessionById.get(feeling.session_id);
+      if (session) {
+        feeling.sessionTitle = session.title;
+        feeling.sessionDate = session.scheduled_date;
+      }
+    }
+  }
 
   const [{ data: logs }, { data: sessionExercises }] = await Promise.all([
     sessionIds.length
@@ -237,7 +279,8 @@ export async function getAthleteFollowUp(
     overdueMonthLabels: paymentState.overduePeriods.map(formatPeriodLabel),
     paymentDueDate: dueDate,
     paymentGraceEnd: graceEnd,
-    checkIns: (checkIns ?? []) as CheckIn[],
+    sessionFeelings: feelings,
+    activities: (activitiesData ?? []) as AthleteActivity[],
     feedbacks,
     sessions: tonnageSessions,
     totals,

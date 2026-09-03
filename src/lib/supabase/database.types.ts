@@ -507,6 +507,262 @@ export type Database = {
           },
         ];
       };
+      session_check_ins: {
+        Row: {
+          id: string;
+          athlete_id: string;
+          session_id: string;
+          energy: number;
+          sleep: number;
+          pain: number;
+          motivation: number;
+          comment: string;
+          needs_attention: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          athlete_id: string;
+          session_id: string;
+          energy: number;
+          sleep: number;
+          pain: number;
+          motivation: number;
+          comment?: string;
+          needs_attention?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          athlete_id?: string;
+          session_id?: string;
+          energy?: number;
+          sleep?: number;
+          pain?: number;
+          motivation?: number;
+          comment?: string;
+          needs_attention?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "session_check_ins_athlete_id_fkey";
+            columns: ["athlete_id"];
+            isOneToOne: false;
+            referencedRelation: "athletes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "session_check_ins_session_id_fkey";
+            columns: ["session_id"];
+            isOneToOne: false;
+            referencedRelation: "sessions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      athlete_activity_recurrences: {
+        Row: {
+          id: string;
+          athlete_id: string;
+          name: string;
+          duration_minutes: number;
+          rpe_default: number | null;
+          weekdays: number[];
+          times_per_week: number | null;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          athlete_id: string;
+          name: string;
+          duration_minutes: number;
+          rpe_default?: number | null;
+          weekdays?: number[];
+          times_per_week?: number | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          athlete_id?: string;
+          name?: string;
+          duration_minutes?: number;
+          rpe_default?: number | null;
+          weekdays?: number[];
+          times_per_week?: number | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "athlete_activity_recurrences_athlete_id_fkey";
+            columns: ["athlete_id"];
+            isOneToOne: false;
+            referencedRelation: "athletes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      athlete_activities: {
+        Row: {
+          id: string;
+          athlete_id: string;
+          recurrence_id: string | null;
+          name: string;
+          duration_minutes: number;
+          rpe: number | null;
+          performed_on: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          athlete_id: string;
+          recurrence_id?: string | null;
+          name: string;
+          duration_minutes: number;
+          rpe?: number | null;
+          performed_on: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          athlete_id?: string;
+          recurrence_id?: string | null;
+          name?: string;
+          duration_minutes?: number;
+          rpe?: number | null;
+          performed_on?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "athlete_activities_athlete_id_fkey";
+            columns: ["athlete_id"];
+            isOneToOne: false;
+            referencedRelation: "athletes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "athlete_activities_recurrence_id_fkey";
+            columns: ["recurrence_id"];
+            isOneToOne: false;
+            referencedRelation: "athlete_activity_recurrences";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      workout_templates: {
+        Row: {
+          id: string;
+          coach_id: string;
+          name: string;
+          kind: Database["public"]["Enums"]["workout_template_kind"];
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          coach_id: string;
+          name: string;
+          kind?: Database["public"]["Enums"]["workout_template_kind"];
+          notes?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          coach_id?: string;
+          name?: string;
+          kind?: Database["public"]["Enums"]["workout_template_kind"];
+          notes?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workout_templates_coach_id_fkey";
+            columns: ["coach_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      workout_template_exercises: {
+        Row: {
+          id: string;
+          template_id: string;
+          exercise_id: string;
+          sort_order: number;
+          sets_count: number;
+          target_reps: number;
+          target_weight_kg: number | null;
+          target_percent: number | null;
+          target_rpe: number | null;
+          rest_seconds: number | null;
+          coach_note: string;
+          superset_group_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          template_id: string;
+          exercise_id: string;
+          sort_order?: number;
+          sets_count?: number;
+          target_reps?: number;
+          target_weight_kg?: number | null;
+          target_percent?: number | null;
+          target_rpe?: number | null;
+          rest_seconds?: number | null;
+          coach_note?: string;
+          superset_group_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          template_id?: string;
+          exercise_id?: string;
+          sort_order?: number;
+          sets_count?: number;
+          target_reps?: number;
+          target_weight_kg?: number | null;
+          target_percent?: number | null;
+          target_rpe?: number | null;
+          rest_seconds?: number | null;
+          coach_note?: string;
+          superset_group_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workout_template_exercises_template_id_fkey";
+            columns: ["template_id"];
+            isOneToOne: false;
+            referencedRelation: "workout_templates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workout_template_exercises_exercise_id_fkey";
+            columns: ["exercise_id"];
+            isOneToOne: false;
+            referencedRelation: "exercises";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       payments: {
         Row: {
           id: string;
@@ -619,6 +875,7 @@ export type Database = {
       payment_status: "pending" | "paid";
       reminder_kind: "session_fill" | "week_prepare" | "payment" | "check_in";
       reminder_channel: "email";
+      workout_template_kind: "day" | "block";
     };
     CompositeTypes: {
       [_ in never]: never;

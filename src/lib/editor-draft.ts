@@ -250,6 +250,62 @@ export function unlinkFromSupersetLocal(
   });
 }
 
+export type TemplateExerciseForInsert = {
+  exercise_id: string;
+  exercise: Exercise | null;
+  sets_count: number;
+  target_reps: number;
+  target_weight_kg: number | null;
+  target_percent: number | null;
+  target_rpe: number | null;
+  rest_seconds: number | null;
+  coach_note: string;
+  superset_group_id: string | null;
+};
+
+/** Insère une copie des exercices d'un template dans une séance (mode block = append, day = replace). */
+export function insertTemplateIntoSessionLocal(
+  week: EditorWeek,
+  sessionId: string,
+  templateExercises: TemplateExerciseForInsert[],
+  mode: "append" | "replace",
+): EditorWeek {
+  const groupMap = new Map<string, string>();
+
+  const copied: EditorSessionExercise[] = templateExercises.map((item, index) => {
+    let groupId = item.superset_group_id;
+    if (groupId) {
+      if (!groupMap.has(groupId)) groupMap.set(groupId, newLocalId());
+      groupId = groupMap.get(groupId)!;
+    }
+    return {
+      id: newLocalId(),
+      session_id: sessionId,
+      exercise_id: item.exercise_id,
+      sort_order: index,
+      sets_count: item.sets_count,
+      target_reps: item.target_reps,
+      target_weight_kg: item.target_weight_kg,
+      target_percent: item.target_percent,
+      target_rpe: item.target_rpe,
+      rest_seconds: item.rest_seconds,
+      coach_note: item.coach_note,
+      superset_group_id: groupId,
+      created_at: "",
+      updated_at: "",
+      exercise: item.exercise,
+    };
+  });
+
+  return updateSession(week, sessionId, (session) => {
+    const base = mode === "replace" ? [] : session.session_exercises;
+    return {
+      ...session,
+      session_exercises: normalizeSessionExercises([...base, ...copied]),
+    };
+  });
+}
+
 export type WeekSyncPayload = {
   sessions: Array<{
     id: string;

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isoWeekday, todayISO, yesterdayISO } from "@/lib/dates";
 import type {
   Athlete,
+  AthleteActivity,
   Exercise,
   ProgramWeek,
   Session,
@@ -40,13 +41,17 @@ function isPast(session: Session, today: string): boolean {
   return session.weekday < isoWeekday(today);
 }
 
+function isTrackableSession(session: { session_type: string }): boolean {
+  return session.session_type === "workout" || session.session_type === "optional";
+}
+
 function kindFor(session: AthleteSessionView, today: string): DayKind {
   if (session.session_type === "rest") return "rest";
   if (session.log?.status === "completed" || session.log?.status === "skipped") {
     return "completed";
   }
   if (isToday(session, today)) return "today";
-  if (isPast(session, today) && session.session_type === "workout") return "missed";
+  if (isPast(session, today) && isTrackableSession(session)) return "missed";
   return "upcoming";
 }
 
@@ -139,7 +144,7 @@ export async function getAthleteProgram(
   const overdue =
     days.find(
       (day) =>
-        day.session.session_type === "workout" &&
+        isTrackableSession(day.session) &&
         dayDate(day.session) === yesterday &&
         day.kind === "missed",
     ) ??
@@ -151,6 +156,13 @@ export async function getAthleteProgram(
       Date.now() - new Date(week.published_at).getTime() < 7 * 24 * 60 * 60 * 1000,
   );
 
+  const { data: activities } = await supabase
+    .from("athlete_activities")
+    .select("*")
+    .eq("athlete_id", athlete.id)
+    .order("performed_on", { ascending: false })
+    .limit(30);
+
   return {
     athlete,
     coachFirstName: coach?.first_name || "ton coach",
@@ -159,6 +171,8 @@ export async function getAthleteProgram(
     today: todayDay,
     overdue,
     programJustPublished,
+    activities: (activities ?? []) as AthleteActivity[],
+    todayISO: today,
   };
 }
 

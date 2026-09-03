@@ -3,4 +3,5 @@ export type AthleteStatus =
   | "prepare"
   | "payment"
   | "two_left"
+  | "feeling"
   | "up_to_date";

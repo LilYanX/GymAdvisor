@@ -55,10 +55,22 @@ export type SetLog = Tables<"set_logs">;
 export type SetLogInsert = TablesInsert<"set_logs">;
 export type SetLogUpdate = TablesUpdate<"set_logs">;
 
-/** Check-in hebdo : énergie, sommeil, douleurs (1–5). */
+/** Check-in hebdo historique : énergie, sommeil, douleurs (1–5). */
 export type CheckIn = Tables<"check_ins">;
 export type CheckInInsert = TablesInsert<"check_ins">;
 export type CheckInUpdate = TablesUpdate<"check_ins">;
+
+/** Ressenti en début de séance (énergie, sommeil, douleurs, motivation). */
+export type SessionCheckIn = Tables<"session_check_ins">;
+export type SessionCheckInInsert = TablesInsert<"session_check_ins">;
+
+export type AthleteActivity = Tables<"athlete_activities">;
+export type AthleteActivityInsert = TablesInsert<"athlete_activities">;
+export type AthleteActivityRecurrence = Tables<"athlete_activity_recurrences">;
+
+export type WorkoutTemplateKind = Enums<"workout_template_kind">;
+export type WorkoutTemplate = Tables<"workout_templates">;
+export type WorkoutTemplateExercise = Tables<"workout_template_exercises">;
 
 /** Statut de paiement du mois, sans encaissement en ligne. */
 export type Payment = Tables<"payments">;

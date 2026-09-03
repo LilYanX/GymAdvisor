@@ -332,7 +332,7 @@ export function SessionWorkout({
 
   const stepLabel =
     group.kind === "superset"
-      ? `Superset ${index + 1} / ${total}`
+      ? `Superset ${index + 1} / ${total} · ${group.items.length} exos`
       : `Exercice ${index + 1} / ${total}`;
 
   return (

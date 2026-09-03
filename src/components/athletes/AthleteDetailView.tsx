@@ -320,27 +320,74 @@ export function AthleteDetailView({ data }: { data: AthleteFollowUp }) {
       </section>
 
       <section>
-        <h2 className="mb-3 text-base font-semibold">Check-ins</h2>
-        {data.checkIns.length === 0 ? (
-          <p className="text-sm text-ga-muted">Aucun check-in.</p>
+        <h2 className="mb-3 text-base font-semibold">Ressentis (début de séance)</h2>
+        {data.sessionFeelings.length === 0 ? (
+          <p className="text-sm text-ga-muted">Aucun ressenti.</p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {data.checkIns.map((checkIn) => (
+            {data.sessionFeelings.map((feeling) => (
               <article
-                key={checkIn.id}
-                className="rounded-xl border border-ga-border bg-ga-card p-4 text-sm"
+                key={feeling.id}
+                className={`rounded-xl border p-4 text-sm ${
+                  feeling.needs_attention
+                    ? "border-ga-red/50 bg-ga-red/10"
+                    : "border-ga-border bg-ga-card"
+                }`}
               >
                 <p className="text-xs text-ga-muted">
-                  Semaine du {formatFeedbackDate(checkIn.week_start_date)}
+                  {feeling.sessionTitle}
+                  {feeling.sessionDate
+                    ? ` · ${formatFeedbackDate(feeling.sessionDate)}`
+                    : ""}
                 </p>
-                <p className="mt-2">Énergie {checkIn.energy}/5</p>
-                <p>Sommeil {checkIn.sleep}/5</p>
-                <p>Douleurs {checkIn.pain}/5</p>
-                {checkIn.comment ? (
-                  <p className="mt-2 text-ga-muted">{checkIn.comment}</p>
+                {feeling.needs_attention ? (
+                  <p className="mt-1 text-xs font-semibold text-ga-red">
+                    Attention — ressenti bas
+                  </p>
+                ) : null}
+                <p className="mt-2">Énergie {feeling.energy}/5</p>
+                <p>Sommeil {feeling.sleep}/5</p>
+                <p>Douleurs {feeling.pain}/5</p>
+                <p>Motivation {feeling.motivation}/5</p>
+                {feeling.comment ? (
+                  <p className="mt-2 text-ga-muted">{feeling.comment}</p>
                 ) : null}
               </article>
             ))}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-base font-semibold">Activités ajoutées</h2>
+        {data.activities.length === 0 ? (
+          <p className="text-sm text-ga-muted">Aucune activité libre.</p>
+        ) : (
+          <div className="ga-table-wrap overflow-x-auto rounded-xl border border-ga-border bg-ga-card">
+            <table className="ga-table w-full text-left text-sm">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3 font-medium">Date</th>
+                  <th className="px-4 py-3 font-medium">Activité</th>
+                  <th className="px-4 py-3 font-medium">Durée</th>
+                  <th className="px-4 py-3 font-medium">RPE</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.activities.map((activity) => (
+                  <tr key={activity.id}>
+                    <td className="px-4 py-3">
+                      {formatFeedbackDate(activity.performed_on)}
+                    </td>
+                    <td className="px-4 py-3">{activity.name}</td>
+                    <td className="px-4 py-3">{activity.duration_minutes} min</td>
+                    <td className="px-4 py-3">
+                      {activity.rpe != null ? activity.rpe : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </section>

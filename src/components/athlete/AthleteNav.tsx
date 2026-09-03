@@ -8,7 +8,7 @@ const ITEMS = [
   { href: "/app", label: "Accueil", icon: IconHome },
   { href: "/app/programme", label: "Programme", icon: IconCalendar },
   { href: "/app/seance", label: "Séance", icon: IconDumbbell },
-  { href: "/app/moi", label: "Moi", icon: IconUser },
+  { href: "/app/moi", label: "Profil", icon: IconUser },
 ];
 
 export function AthleteNav() {

@@ -1,7 +1,8 @@
 import type {
   Athlete,
-  CheckIn,
+  AthleteActivity,
   Payment,
+  SessionCheckIn,
 } from "@/lib/supabase/models";
 import type { PaymentDisplayStatus } from "@/lib/payments";
 
@@ -30,6 +31,11 @@ export type TonnageSession = {
   exercises: TonnageExercise[];
 };
 
+export type SessionFeeling = SessionCheckIn & {
+  sessionTitle: string;
+  sessionDate: string | null;
+};
+
 export type AthleteFollowUp = {
   athlete: Athlete;
   payment: Payment | null;
@@ -38,7 +44,8 @@ export type AthleteFollowUp = {
   overdueMonthLabels: string[];
   paymentDueDate: string;
   paymentGraceEnd: string;
-  checkIns: CheckIn[];
+  sessionFeelings: SessionFeeling[];
+  activities: AthleteActivity[];
   feedbacks: FeedbackItem[];
   sessions: TonnageSession[];
   totals: {

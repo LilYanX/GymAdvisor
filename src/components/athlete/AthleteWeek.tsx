@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { AthleteProgram } from "@/lib/athlete-types";
 import { weekdayLabel } from "@/lib/labels";
+import { AthleteActivitiesSection } from "@/components/athlete/AthleteActivitiesSection";
 
 export function AthleteWeek({ data }: { data: AthleteProgram }) {
   return (
@@ -14,7 +15,8 @@ export function AthleteWeek({ data }: { data: AthleteProgram }) {
           {data.days.map((day) => {
             const session = day.session;
             const href =
-              session.session_type === "workout"
+              session.session_type === "workout" ||
+              session.session_type === "optional"
                 ? `/app/seance/${session.id}`
                 : undefined;
             const badge =
@@ -24,7 +26,9 @@ export function AthleteWeek({ data }: { data: AthleteProgram }) {
                   ? { label: "Repos", className: "border border-dashed border-ga-muted text-ga-muted" }
                   : day.kind === "today"
                     ? { label: "Aujourd’hui", className: "bg-ga-lime/15 text-ga-lime" }
-                    : { label: "À venir", className: "bg-ga-elevated text-ga-muted" };
+                    : session.session_type === "optional"
+                      ? { label: "Optionnel", className: "bg-ga-blue/15 text-ga-blue" }
+                      : { label: "À venir", className: "bg-ga-elevated text-ga-muted" };
 
             const details =
               session.session_type === "rest"
@@ -60,6 +64,11 @@ export function AthleteWeek({ data }: { data: AthleteProgram }) {
           })}
         </div>
       )}
+
+      <AthleteActivitiesSection
+        activities={data.activities}
+        defaultDate={data.todayISO}
+      />
     </div>
   );
 }

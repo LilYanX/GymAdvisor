@@ -5,6 +5,7 @@ const LABELS: Record<AthleteStatus, string> = {
   prepare: "À préparer",
   payment: "Paiement en attente",
   two_left: "2 séances restantes",
+  feeling: "Ressenti bas",
   up_to_date: "À jour",
 };
 
@@ -13,6 +14,7 @@ const TONES: Record<AthleteStatus, string> = {
   prepare: "bg-ga-blue/15 text-ga-blue",
   payment: "bg-ga-red/15 text-ga-red",
   two_left: "bg-ga-amber/15 text-ga-amber",
+  feeling: "bg-ga-red/15 text-ga-red",
   up_to_date: "bg-ga-lime/15 text-ga-lime",
 };
 

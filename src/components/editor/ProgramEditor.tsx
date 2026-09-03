@@ -8,6 +8,7 @@ import {
   addExerciseToSessionLocal,
   addSessionLocal,
   deleteSessionLocal,
+  insertTemplateIntoSessionLocal,
   linkSupersetWithPreviousLocal,
   moveSessionExerciseLocal,
   removeSessionExerciseLocal,
@@ -19,6 +20,7 @@ import {
   publishWeek,
   syncWeekDraft,
 } from "@/lib/actions/program";
+import type { SavedTemplate } from "@/components/editor/SubProgramEditor";
 import {
   formatRest,
   MUSCLE_GROUP_LABELS,
@@ -124,7 +126,13 @@ function editorWeekStatusLabel(week: EditorWeek, dirty: boolean): string {
   return "Non publiée";
 }
 
-export function ProgramEditor({ data }: { data: EditorData }) {
+export function ProgramEditor({
+  data,
+  templates = [],
+}: {
+  data: EditorData;
+  templates?: SavedTemplate[];
+}) {
   const router = useRouter();
   const { setLoading } = useLoading();
   const [creatingWeek, startCreateWeek] = useTransition();
@@ -139,6 +147,7 @@ export function ProgramEditor({ data }: { data: EditorData }) {
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [draftWeek, setDraftWeek] = useState<EditorWeek | null>(data.week);
   const [dirty, setDirty] = useState(false);
+  const [insertSessionId, setInsertSessionId] = useState<string | null>(null);
   const libraryScrollRef = useRef<HTMLDivElement>(null);
   const sessionScrollRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -536,7 +545,7 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                           className="rounded-lg border border-ga-blue/40 bg-ga-blue/5 p-2"
                         >
                           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-ga-blue">
-                            Superset
+                            Superset · {group.items.length} exercices
                           </p>
                           <div className="flex flex-col gap-2">
                             {group.items.map((item) => (
@@ -590,6 +599,13 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                           pending={publishing}
                           inSuperset={false}
                           canLinkSuperset={group.index > 0}
+                          linkSupersetLabel={
+                            group.index > 0 &&
+                            session.session_exercises[group.index - 1]
+                              ?.superset_group_id
+                              ? "Ajouter au superset précédent"
+                              : "Superset avec le précédent"
+                          }
                           draggable={!publishing && expandedId !== group.item.id}
                           onDragEnd={() => {
                             setDragOverSessionId(null);
@@ -630,13 +646,79 @@ export function ProgramEditor({ data }: { data: EditorData }) {
                       </div>
                     );})}
                     <DropZone {...bindDropZone(session.id, null)} />
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSessionId(session.id)}
-                      className="rounded-lg border border-dashed border-ga-border px-3 py-2 text-left text-sm text-ga-muted hover:border-ga-lime hover:text-ga-fg"
-                    >
-                      + Ajouter un exercice
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSessionId(session.id)}
+                        className="rounded-lg border border-dashed border-ga-border px-3 py-2 text-left text-sm text-ga-muted hover:border-ga-lime hover:text-ga-fg"
+                      >
+                        + Ajouter un exercice
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setInsertSessionId((current) =>
+                            current === session.id ? null : session.id,
+                          )
+                        }
+                        className="rounded-lg border border-dashed border-ga-blue/40 px-3 py-2 text-left text-sm text-ga-blue hover:bg-ga-blue/10"
+                      >
+                        Insérer un sous-programme
+                      </button>
+                      {insertSessionId === session.id ? (
+                        <div className="rounded-lg border border-ga-border bg-ga-elevated p-2">
+                          {templates.length === 0 ? (
+                            <p className="text-xs text-ga-muted">
+                              Aucun sous-programme. Crée-en un dans l’onglet
+                              Sous-programme.
+                            </p>
+                          ) : (
+                            <>
+                              <p className="mb-2 text-xs text-ga-muted">
+                                Choisir un modèle
+                              </p>
+                              <div className="flex flex-col gap-1">
+                                {templates.map((template) => (
+                                  <button
+                                    key={template.id}
+                                    type="button"
+                                    onClick={() => {
+                                      const currentWeek = draftWeek ?? week;
+                                      if (!currentWeek) return;
+                                      applyWeek(
+                                        insertTemplateIntoSessionLocal(
+                                          currentWeek,
+                                          session.id,
+                                          template.exercises,
+                                          template.kind === "day"
+                                            ? "replace"
+                                            : "append",
+                                        ),
+                                      );
+                                      setInsertSessionId(null);
+                                    }}
+                                    className="rounded-md px-2 py-1.5 text-left text-xs hover:bg-ga-card"
+                                  >
+                                    <span className="font-medium">
+                                      {template.name}
+                                    </span>
+                                    <span className="text-ga-muted">
+                                      {" "}
+                                      ·{" "}
+                                      {template.kind === "day"
+                                        ? "journée"
+                                        : "bloc"}{" "}
+                                      · {template.exercises.length} exo
+                                      {template.exercises.length > 1 ? "s" : ""}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
                     </div>
                   </div>
                 </section>
@@ -735,6 +817,7 @@ function ExerciseBlock({
   pending,
   inSuperset,
   canLinkSuperset,
+  linkSupersetLabel = "Superset avec le précédent",
   draggable = false,
   onDragEnd,
   onToggle,
@@ -748,6 +831,7 @@ function ExerciseBlock({
   pending: boolean;
   inSuperset: boolean;
   canLinkSuperset: boolean;
+  linkSupersetLabel?: string;
   draggable?: boolean;
   onDragEnd?: () => void;
   onToggle: () => void;
@@ -852,7 +936,7 @@ function ExerciseBlock({
                 onClick={onLinkSuperset}
                 className="rounded-md border border-ga-blue/40 px-2 py-1 text-xs text-ga-blue hover:bg-ga-blue/10 disabled:opacity-50"
               >
-                Superset avec le précédent
+                {linkSupersetLabel}
               </button>
             ) : null}
             {inSuperset ? (
