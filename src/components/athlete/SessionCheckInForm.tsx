@@ -63,11 +63,7 @@ export function SessionCheckInForm({
       <div className="px-5 pb-32 pt-8">
         <p className="text-sm text-ga-muted">{sessionTitle}</p>
         <h1 className="mt-1 text-2xl font-semibold">Comment tu te sens ?</h1>
-        <p className="mt-2 text-sm text-ga-muted">
-          Avant de commencer, indique ton ressenti. Ton coach est alerté si ça ne
-          va pas.
-        </p>
-
+        
         <form id="session-checkin-form" action={action} className="mt-8 flex flex-col gap-6">
           <input type="hidden" name="session_id" value={sessionId} />
           <Scale name="energy" label="Énergie" />

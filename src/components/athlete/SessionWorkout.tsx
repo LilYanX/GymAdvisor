@@ -16,6 +16,7 @@ import {
   workoutGroupItems,
   type WorkoutGroup,
 } from "@/lib/workout-groups";
+import { formatPrescriptionQuantity } from "@/lib/labels";
 
 type SetDraft = {
   set_number: number;
@@ -31,7 +32,15 @@ type ExerciseDraft = {
 };
 
 function prescription(item: AthleteExercise): string {
-  const parts = [`${item.sets_count} × ${item.target_reps}`];
+  const parts = [
+    formatPrescriptionQuantity(
+      item.sets_count,
+      item.target_reps,
+      item.target_unit ?? "reps",
+      item.target_secondary_reps ?? null,
+    ),
+  ];
+  if (item.tempo) parts.push(`tempo ${item.tempo}`);
   if (item.target_weight_kg != null) parts.push(`vise ${item.target_weight_kg} kg`);
   if (item.target_rpe != null) parts.push(`RPE ${item.target_rpe}`);
   if (item.coach_note) parts.push(item.coach_note);

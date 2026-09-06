@@ -69,6 +69,7 @@ export type AthleteActivityInsert = TablesInsert<"athlete_activities">;
 export type AthleteActivityRecurrence = Tables<"athlete_activity_recurrences">;
 
 export type WorkoutTemplateKind = Enums<"workout_template_kind">;
+export type TargetUnit = Enums<"target_unit">;
 export type WorkoutTemplate = Tables<"workout_templates">;
 export type WorkoutTemplateExercise = Tables<"workout_template_exercises">;
 

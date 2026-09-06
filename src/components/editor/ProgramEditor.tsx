@@ -22,13 +22,15 @@ import {
 } from "@/lib/actions/program";
 import type { SavedTemplate } from "@/components/editor/SubProgramEditor";
 import {
+  formatPrescriptionQuantity,
   formatRest,
   MUSCLE_GROUP_LABELS,
   SESSION_TYPE_LABELS,
+  TARGET_UNIT_LABELS,
   WEEKDAYS,
   weekdayLabel,
 } from "@/lib/labels";
-import type { SessionType } from "@/lib/supabase/models";
+import type { SessionType, TargetUnit } from "@/lib/supabase/models";
 import { IconPlus, IconTrash } from "@/components/icons";
 import { ExerciseMedia } from "@/components/media/ExerciseMedia";
 import { useLoading } from "@/components/layout/LoadingProvider";
@@ -841,7 +843,13 @@ function ExerciseBlock({
   onUnlinkSuperset: () => void;
 }) {
   const summary = [
-    `${item.sets_count} × ${item.target_reps}`,
+    formatPrescriptionQuantity(
+      item.sets_count,
+      item.target_reps,
+      item.target_unit ?? "reps",
+      item.target_secondary_reps ?? null,
+    ),
+    item.tempo ? `tempo ${item.tempo}` : null,
     item.target_percent != null ? `@ ${item.target_percent}%` : null,
     item.target_weight_kg != null ? `@ ${item.target_weight_kg} kg` : null,
     item.target_rpe != null ? `@ RPE ${item.target_rpe}` : null,
@@ -849,6 +857,8 @@ function ExerciseBlock({
   ]
     .filter(Boolean)
     .join(" · ");
+
+  const unit = item.target_unit ?? "reps";
 
   return (
     <article
@@ -889,12 +899,59 @@ function ExerciseBlock({
             disabled={pending}
             onChange={(value) => onSave({ sets_count: value ?? 1 })}
           />
-          <NumberField
-            label="Reps"
-            value={item.target_reps}
-            disabled={pending}
-            onChange={(value) => onSave({ target_reps: value ?? 1 })}
-          />
+          <label className="text-xs text-ga-muted">
+            Unité
+            <div className="mt-1 flex gap-1">
+              <select
+                value={unit}
+                disabled={pending}
+                onChange={(event) => {
+                  const next = event.target.value as TargetUnit;
+                  onSave({
+                    target_unit: next,
+                    target_secondary_reps:
+                      next === "seconds"
+                        ? (item.target_secondary_reps ?? 1)
+                        : null,
+                  });
+                }}
+                className="w-[42%] shrink-0 rounded-md border border-ga-border bg-ga-card px-1.5 py-1.5 text-sm text-ga-fg outline-none focus:border-ga-lime"
+              >
+                {(Object.keys(TARGET_UNIT_LABELS) as TargetUnit[]).map((key) => (
+                  <option key={key} value={key}>
+                    {TARGET_UNIT_LABELS[key]}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                step="any"
+                value={item.target_reps}
+                disabled={pending}
+                onChange={(event) => {
+                  const raw = event.target.value.trim();
+                  const n = raw === "" ? NaN : Number(raw);
+                  onSave({
+                    target_reps: Number.isFinite(n) && n >= 1 ? Math.round(n) : 1,
+                  });
+                }}
+                className="min-w-0 flex-1 rounded-md border border-ga-border bg-ga-card px-2 py-1.5 text-sm text-ga-fg outline-none focus:border-ga-lime"
+              />
+            </div>
+          </label>
+          {unit === "seconds" ? (
+            <NumberField
+              label="Reps"
+              value={item.target_secondary_reps}
+              disabled={pending}
+              onChange={(value) =>
+                onSave({
+                  target_secondary_reps:
+                    value != null && value >= 1 ? Math.round(value) : 1,
+                })
+              }
+            />
+          ) : null}
           <NumberField
             label="Charge (kg)"
             value={item.target_weight_kg}
@@ -917,8 +974,18 @@ function ExerciseBlock({
             label="Repos (sec)"
             value={item.rest_seconds}
             disabled={pending}
+            min={0}
             onChange={(value) => onSave({ rest_seconds: value })}
           />
+          <label className="col-span-2 text-xs text-ga-muted">
+            Tempo
+            <input
+              value={item.tempo ?? ""}
+              disabled={pending}
+              onChange={(event) => onSave({ tempo: event.target.value })}
+              className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1.5 text-sm text-ga-fg outline-none focus:border-ga-lime"
+            />
+          </label>
           <label className="col-span-2 text-xs text-ga-muted">
             Note
             <input
@@ -960,11 +1027,13 @@ function NumberField({
   label,
   value,
   disabled,
+  min,
   onChange,
 }: {
   label: string;
   value: number | null;
   disabled: boolean;
+  min?: number;
   onChange: (value: number | null) => void;
 }) {
   return (
@@ -977,7 +1046,20 @@ function NumberField({
         disabled={disabled}
         onChange={(event) => {
           const raw = event.target.value.trim();
-          onChange(raw === "" ? null : Number(raw));
+          if (raw === "") {
+            onChange(null);
+            return;
+          }
+          const n = Number(raw);
+          if (!Number.isFinite(n)) {
+            onChange(null);
+            return;
+          }
+          if (min != null && n < min) {
+            onChange(null);
+            return;
+          }
+          onChange(n);
         }}
         className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1.5 text-sm text-ga-fg outline-none focus:border-ga-lime"
       />

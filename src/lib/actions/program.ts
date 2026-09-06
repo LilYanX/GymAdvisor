@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireCoach } from "@/lib/auth";
 import { addDaysISO, mondayOfWeekISO } from "@/lib/dates";
-import { isLocalId, type WeekSyncPayload } from "@/lib/editor-draft";
+import { isLocalId, sanitizeRestSeconds, type WeekSyncPayload } from "@/lib/editor-draft";
 import { createClient } from "@/lib/supabase/server";
 import type { SessionType } from "@/lib/supabase/models";
 
@@ -260,7 +260,9 @@ export async function addExerciseToSession(
       sort_order: maxOrder + 1,
       sets_count: 4,
       target_reps: 8,
+      target_unit: "reps",
       rest_seconds: 120,
+      tempo: "",
     })
     .select("id")
     .single();
@@ -280,17 +282,27 @@ export async function updateSessionExercise(
   patch: {
     sets_count?: number;
     target_reps?: number;
+    target_unit?: "reps" | "meters" | "seconds";
+    target_secondary_reps?: number | null;
     target_weight_kg?: number | null;
     target_percent?: number | null;
     target_rpe?: number | null;
     rest_seconds?: number | null;
+    tempo?: string;
     coach_note?: string;
     superset_group_id?: string | null;
   },
 ) {
   await requireCoach();
   const supabase = await createClient();
-  const { error } = await supabase.from("session_exercises").update(patch).eq("id", id);
+  const sanitized = {
+    ...patch,
+    rest_seconds:
+      patch.rest_seconds !== undefined
+        ? sanitizeRestSeconds(patch.rest_seconds)
+        : undefined,
+  };
+  const { error } = await supabase.from("session_exercises").update(sanitized).eq("id", id);
   if (error) return { error: error.message };
   return { error: null };
 }
@@ -334,10 +346,13 @@ export type WeekDraftPayload = {
       id: string;
       sets_count: number;
       target_reps: number;
+      target_unit: "reps" | "meters" | "seconds";
+      target_secondary_reps: number | null;
       target_weight_kg: number | null;
       target_percent: number | null;
       target_rpe: number | null;
       rest_seconds: number | null;
+      tempo: string;
       coach_note: string;
     }>;
   }>;
@@ -459,10 +474,13 @@ export async function syncWeekDraft(weekId: string, payload: WeekSyncPayload) {
         superset_group_id: supersetGroupId,
         sets_count: exercise.sets_count,
         target_reps: exercise.target_reps,
+        target_unit: exercise.target_unit ?? "reps",
+        target_secondary_reps: exercise.target_secondary_reps ?? null,
         target_weight_kg: exercise.target_weight_kg,
         target_percent: exercise.target_percent,
         target_rpe: exercise.target_rpe,
-        rest_seconds: exercise.rest_seconds,
+        rest_seconds: sanitizeRestSeconds(exercise.rest_seconds),
+        tempo: exercise.tempo ?? "",
         coach_note: exercise.coach_note,
       };
 
@@ -537,10 +555,13 @@ export async function saveWeekDraft(weekId: string, payload: WeekDraftPayload) {
         .update({
           sets_count: exercise.sets_count,
           target_reps: exercise.target_reps,
+          target_unit: exercise.target_unit ?? "reps",
+          target_secondary_reps: exercise.target_secondary_reps ?? null,
           target_weight_kg: exercise.target_weight_kg,
           target_percent: exercise.target_percent,
           target_rpe: exercise.target_rpe,
-          rest_seconds: exercise.rest_seconds,
+          rest_seconds: sanitizeRestSeconds(exercise.rest_seconds),
+          tempo: exercise.tempo ?? "",
           coach_note: exercise.coach_note,
         })
         .eq("id", exercise.id);

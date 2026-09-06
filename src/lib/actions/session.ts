@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAthlete } from "@/lib/auth";
+import { loggingRepsForExercise } from "@/lib/athlete-sets";
 import { createClient } from "@/lib/supabase/server";
 
 function refresh() {
@@ -71,7 +72,7 @@ export async function startSession(sessionId: string) {
       athlete_id: owned.athlete.id,
       set_number: setNumber,
       weight_kg: item.target_weight_kg,
-      reps: item.target_reps,
+      reps: loggingRepsForExercise(item),
       completed: false,
     }));
     const { error: setError } = await supabase.from("set_logs").insert(rows);

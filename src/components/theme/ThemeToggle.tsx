@@ -38,14 +38,14 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors ${
         isLight
           ? "border-amber-300/70 bg-amber-100"
-          : "border-ga-border bg-[#2a2a32]"
+          : "border-ga-border bg-ga-elevated"
       } ${className}`}
     >
       <span
         className={`inline-block h-5 w-5 rounded-full shadow-sm transition-transform ${
           isLight
             ? "translate-x-[1.375rem] bg-ga-fg"
-            : "translate-x-1 bg-[#f4f4f5]"
+            : "translate-x-1 bg-ga-fg"
         }`}
       />
     </button>

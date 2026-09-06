@@ -8,8 +8,8 @@ import {
   saveWorkoutTemplate,
 } from "@/lib/actions/templates";
 import { newLocalId } from "@/lib/editor-draft";
-import { MUSCLE_GROUP_LABELS } from "@/lib/labels";
-import type { Exercise, WorkoutTemplateKind } from "@/lib/supabase/models";
+import { MUSCLE_GROUP_LABELS, TARGET_UNIT_LABELS } from "@/lib/labels";
+import type { Exercise, TargetUnit, WorkoutTemplateKind } from "@/lib/supabase/models";
 import { IconPlus, IconTrash } from "@/components/icons";
 import { useLoading } from "@/components/layout/LoadingProvider";
 import { ExerciseMedia } from "@/components/media/ExerciseMedia";
@@ -20,10 +20,13 @@ export type TemplateExerciseDraft = {
   exercise: Exercise | null;
   sets_count: number;
   target_reps: number;
+  target_unit: TargetUnit;
+  target_secondary_reps: number | null;
   target_weight_kg: number | null;
   target_percent: number | null;
   target_rpe: number | null;
   rest_seconds: number | null;
+  tempo: string;
   coach_note: string;
   superset_group_id: string | null;
 };
@@ -97,10 +100,13 @@ export function SubProgramEditor({
           exercise,
           sets_count: 4,
           target_reps: 8,
+          target_unit: "reps",
+          target_secondary_reps: null,
           target_weight_kg: null,
           target_percent: null,
           target_rpe: null,
           rest_seconds: 120,
+          tempo: "",
           coach_note: "",
           superset_group_id: null,
         },
@@ -135,10 +141,13 @@ export function SubProgramEditor({
           sort_order: index,
           sets_count: item.sets_count,
           target_reps: item.target_reps,
+          target_unit: item.target_unit ?? "reps",
+          target_secondary_reps: item.target_secondary_reps ?? null,
           target_weight_kg: item.target_weight_kg,
           target_percent: item.target_percent,
           target_rpe: item.target_rpe,
           rest_seconds: item.rest_seconds,
+          tempo: item.tempo ?? "",
           coach_note: item.coach_note,
           superset_group_id: item.superset_group_id,
         })),
@@ -324,7 +333,7 @@ export function SubProgramEditor({
                         <IconTrash className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <div className="mt-2 grid grid-cols-3 gap-2">
+                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                       <label className="text-xs text-ga-muted">
                         Séries
                         <input
@@ -346,33 +355,92 @@ export function SubProgramEditor({
                           className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1 text-sm"
                         />
                       </label>
-                      <label className="text-xs text-ga-muted">
-                        Reps
-                        <input
-                          type="number"
-                          value={item.target_reps}
-                          onChange={(event) =>
-                            setDraft((current) => ({
-                              ...current,
-                              exercises: current.exercises.map((exercise) =>
-                                exercise.id === item.id
-                                  ? {
-                                      ...exercise,
-                                      target_reps: Number(event.target.value) || 1,
-                                    }
-                                  : exercise,
+                      <label className="text-xs text-ga-muted sm:col-span-2">
+                        Unité
+                        <div className="mt-1 flex gap-1">
+                          <select
+                            value={item.target_unit ?? "reps"}
+                            onChange={(event) => {
+                              const next = event.target.value as TargetUnit;
+                              setDraft((current) => ({
+                                ...current,
+                                exercises: current.exercises.map((exercise) =>
+                                  exercise.id === item.id
+                                    ? {
+                                        ...exercise,
+                                        target_unit: next,
+                                        target_secondary_reps:
+                                          next === "seconds"
+                                            ? (exercise.target_secondary_reps ?? 1)
+                                            : null,
+                                      }
+                                    : exercise,
+                                ),
+                              }));
+                            }}
+                            className="w-[42%] shrink-0 rounded-md border border-ga-border bg-ga-card px-1.5 py-1 text-sm"
+                          >
+                            {(Object.keys(TARGET_UNIT_LABELS) as TargetUnit[]).map(
+                              (key) => (
+                                <option key={key} value={key}>
+                                  {TARGET_UNIT_LABELS[key]}
+                                </option>
                               ),
-                            }))
-                          }
-                          className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1 text-sm"
-                        />
+                            )}
+                          </select>
+                          <input
+                            type="number"
+                            value={item.target_reps}
+                            onChange={(event) =>
+                              setDraft((current) => ({
+                                ...current,
+                                exercises: current.exercises.map((exercise) =>
+                                  exercise.id === item.id
+                                    ? {
+                                        ...exercise,
+                                        target_reps:
+                                          Number(event.target.value) || 1,
+                                      }
+                                    : exercise,
+                                ),
+                              }))
+                            }
+                            className="min-w-0 flex-1 rounded-md border border-ga-border bg-ga-card px-2 py-1 text-sm"
+                          />
+                        </div>
                       </label>
+                      {(item.target_unit ?? "reps") === "seconds" ? (
+                        <label className="text-xs text-ga-muted">
+                          Reps
+                          <input
+                            type="number"
+                            value={item.target_secondary_reps ?? 1}
+                            onChange={(event) =>
+                              setDraft((current) => ({
+                                ...current,
+                                exercises: current.exercises.map((exercise) =>
+                                  exercise.id === item.id
+                                    ? {
+                                        ...exercise,
+                                        target_secondary_reps:
+                                          Number(event.target.value) || 1,
+                                      }
+                                    : exercise,
+                                ),
+                              }))
+                            }
+                            className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1 text-sm"
+                          />
+                        </label>
+                      ) : null}
                       <label className="text-xs text-ga-muted">
                         Repos (s)
                         <input
                           type="number"
                           value={item.rest_seconds ?? ""}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            const raw = event.target.value.trim();
+                            const n = raw === "" ? null : Number(raw);
                             setDraft((current) => ({
                               ...current,
                               exercises: current.exercises.map((exercise) =>
@@ -380,10 +448,27 @@ export function SubProgramEditor({
                                   ? {
                                       ...exercise,
                                       rest_seconds:
-                                        event.target.value === ""
+                                        n == null || !Number.isFinite(n) || n < 0
                                           ? null
-                                          : Number(event.target.value),
+                                          : Math.round(n),
                                     }
+                                  : exercise,
+                              ),
+                            }));
+                          }}
+                          className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1 text-sm"
+                        />
+                      </label>
+                      <label className="col-span-2 text-xs text-ga-muted sm:col-span-3">
+                        Tempo
+                        <input
+                          value={item.tempo ?? ""}
+                          onChange={(event) =>
+                            setDraft((current) => ({
+                              ...current,
+                              exercises: current.exercises.map((exercise) =>
+                                exercise.id === item.id
+                                  ? { ...exercise, tempo: event.target.value }
                                   : exercise,
                               ),
                             }))
@@ -466,7 +551,13 @@ export function SubProgramEditor({
                           name: template.name,
                           kind: template.kind,
                           notes: template.notes,
-                          exercises: template.exercises,
+                          exercises: template.exercises.map((exercise) => ({
+                            ...exercise,
+                            target_unit: exercise.target_unit ?? "reps",
+                            target_secondary_reps:
+                              exercise.target_secondary_reps ?? null,
+                            tempo: exercise.tempo ?? "",
+                          })),
                         })
                       }
                       className="mt-3 text-sm text-ga-lime hover:underline"

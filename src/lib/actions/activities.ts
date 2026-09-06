@@ -92,6 +92,46 @@ export async function createAthleteActivity(input: {
   return { error: null };
 }
 
+export async function updateAthleteActivity(input: {
+  activityId: string;
+  name: string;
+  durationMinutes: number;
+  rpe: number | null;
+  performedOn: string;
+}): Promise<{ error: string | null }> {
+  const { athlete } = await requireAthlete();
+  if (!athlete) return { error: "Ton espace n’est pas encore lié à un coach." };
+
+  const name = input.name.trim();
+  if (!name) return { error: "Indique un nom d’activité." };
+  if (!Number.isInteger(input.durationMinutes) || input.durationMinutes <= 0) {
+    return { error: "La durée doit être un nombre positif." };
+  }
+  if (
+    input.rpe != null &&
+    (!Number.isInteger(input.rpe) || input.rpe < 1 || input.rpe > 10)
+  ) {
+    return { error: "Le RPE doit être entre 1 et 10." };
+  }
+  if (!input.performedOn) return { error: "Indique une date." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("athlete_activities")
+    .update({
+      name,
+      duration_minutes: input.durationMinutes,
+      rpe: input.rpe,
+      performed_on: input.performedOn,
+    })
+    .eq("id", input.activityId)
+    .eq("athlete_id", athlete.id);
+
+  if (error) return { error: error.message };
+  refreshAthlete();
+  return { error: null };
+}
+
 export async function deleteAthleteActivity(
   activityId: string,
 ): Promise<{ error: string | null }> {

@@ -2,19 +2,22 @@
 
 import { revalidatePath } from "next/cache";
 import { requireCoach } from "@/lib/auth";
-import { isLocalId } from "@/lib/editor-draft";
+import { isLocalId, sanitizeRestSeconds } from "@/lib/editor-draft";
 import { createClient } from "@/lib/supabase/server";
-import type { WorkoutTemplateKind } from "@/lib/supabase/models";
+import type { TargetUnit, WorkoutTemplateKind } from "@/lib/supabase/models";
 
 export type TemplateExercisePayload = {
   exercise_id: string;
   sort_order: number;
   sets_count: number;
   target_reps: number;
+  target_unit: TargetUnit;
+  target_secondary_reps: number | null;
   target_weight_kg: number | null;
   target_percent: number | null;
   target_rpe: number | null;
   rest_seconds: number | null;
+  tempo: string;
   coach_note: string;
   superset_group_id: string | null;
 };
@@ -129,10 +132,13 @@ export async function saveWorkoutTemplate(
         sort_order: index,
         sets_count: exercise.sets_count,
         target_reps: exercise.target_reps,
+        target_unit: exercise.target_unit ?? "reps",
+        target_secondary_reps: exercise.target_secondary_reps ?? null,
         target_weight_kg: exercise.target_weight_kg,
         target_percent: exercise.target_percent,
         target_rpe: exercise.target_rpe,
-        rest_seconds: exercise.rest_seconds,
+        rest_seconds: sanitizeRestSeconds(exercise.rest_seconds),
+        tempo: exercise.tempo ?? "",
         coach_note: exercise.coach_note,
         superset_group_id: groupId,
       };

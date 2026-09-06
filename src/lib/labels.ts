@@ -1,4 +1,29 @@
-import type { MuscleGroup, SessionType } from "@/lib/supabase/models";
+import type { MuscleGroup, SessionType, TargetUnit } from "@/lib/supabase/models";
+
+export const TARGET_UNIT_LABELS: Record<TargetUnit, string> = {
+  reps: "Reps",
+  meters: "Mètres",
+  seconds: "Secondes",
+};
+
+export function formatPrescriptionQuantity(
+  setsCount: number,
+  quantity: number,
+  unit: TargetUnit,
+  secondaryReps: number | null,
+): string {
+  const quantityLabel =
+    unit === "meters"
+      ? `${quantity} m`
+      : unit === "seconds"
+        ? `${quantity} s`
+        : `${quantity}`;
+  const base = `${setsCount} × ${quantityLabel}`;
+  if (unit === "seconds" && secondaryReps != null) {
+    return `${base} · ${secondaryReps} reps`;
+  }
+  return base;
+}
 
 export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
   jambe: "Jambe",

@@ -3,7 +3,7 @@ import type {
   EditorSessionExercise,
   EditorWeek,
 } from "@/lib/editor-types";
-import type { Exercise, SessionType } from "@/lib/supabase/models";
+import type { Exercise, SessionType, TargetUnit } from "@/lib/supabase/models";
 
 const LOCAL_PREFIX = "local:";
 
@@ -13,6 +13,12 @@ export function isLocalId(id: string): boolean {
 
 export function newLocalId(): string {
   return `${LOCAL_PREFIX}${crypto.randomUUID()}`;
+}
+
+export function sanitizeRestSeconds(value: number | null | undefined): number | null {
+  if (value == null) return null;
+  if (!Number.isFinite(value) || value < 0) return null;
+  return Math.round(value);
 }
 
 function normalizeSessionExercises(
@@ -99,10 +105,13 @@ export function addExerciseToSessionLocal(
     sort_order: 0,
     sets_count: 4,
     target_reps: 8,
+    target_unit: "reps",
+    target_secondary_reps: null,
     target_weight_kg: null,
     target_percent: null,
     target_rpe: null,
     rest_seconds: 120,
+    tempo: "",
     coach_note: "",
     superset_group_id: null,
     created_at: "",
@@ -255,10 +264,13 @@ export type TemplateExerciseForInsert = {
   exercise: Exercise | null;
   sets_count: number;
   target_reps: number;
+  target_unit: TargetUnit;
+  target_secondary_reps: number | null;
   target_weight_kg: number | null;
   target_percent: number | null;
   target_rpe: number | null;
   rest_seconds: number | null;
+  tempo: string;
   coach_note: string;
   superset_group_id: string | null;
 };
@@ -285,10 +297,13 @@ export function insertTemplateIntoSessionLocal(
       sort_order: index,
       sets_count: item.sets_count,
       target_reps: item.target_reps,
+      target_unit: item.target_unit ?? "reps",
+      target_secondary_reps: item.target_secondary_reps ?? null,
       target_weight_kg: item.target_weight_kg,
       target_percent: item.target_percent,
       target_rpe: item.target_rpe,
       rest_seconds: item.rest_seconds,
+      tempo: item.tempo ?? "",
       coach_note: item.coach_note,
       superset_group_id: groupId,
       created_at: "",
@@ -320,10 +335,13 @@ export type WeekSyncPayload = {
       superset_group_id: string | null;
       sets_count: number;
       target_reps: number;
+      target_unit: TargetUnit;
+      target_secondary_reps: number | null;
       target_weight_kg: number | null;
       target_percent: number | null;
       target_rpe: number | null;
       rest_seconds: number | null;
+      tempo: string;
       coach_note: string;
     }>;
   }>;
@@ -344,10 +362,13 @@ export function serializeWeekForSync(week: EditorWeek): WeekSyncPayload {
         superset_group_id: exercise.superset_group_id,
         sets_count: exercise.sets_count,
         target_reps: exercise.target_reps,
+        target_unit: exercise.target_unit ?? "reps",
+        target_secondary_reps: exercise.target_secondary_reps ?? null,
         target_weight_kg: exercise.target_weight_kg,
         target_percent: exercise.target_percent,
         target_rpe: exercise.target_rpe,
-        rest_seconds: exercise.rest_seconds,
+        rest_seconds: sanitizeRestSeconds(exercise.rest_seconds),
+        tempo: exercise.tempo ?? "",
         coach_note: exercise.coach_note,
       })),
     })),
