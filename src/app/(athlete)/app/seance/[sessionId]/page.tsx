@@ -4,6 +4,7 @@ import { getAthleteSession } from "@/lib/athlete";
 import { startSession } from "@/lib/actions/session";
 import { SessionWorkout } from "@/components/athlete/SessionWorkout";
 import { SessionCheckInForm } from "@/components/athlete/SessionCheckInForm";
+import { SessionStartTimeForm } from "@/components/athlete/SessionStartTimeForm";
 import {
   firstIncompleteGroupIndex,
   groupWorkoutExercises,
@@ -24,19 +25,26 @@ export default async function SeancePage({ params }: Props) {
   if (!session) notFound();
 
   const supabase = await createClient();
-  const [{ data: checkIn }, { data: coach }] = await Promise.all([
-    supabase
-      .from("session_check_ins")
-      .select("id")
-      .eq("athlete_id", athlete.id)
-      .eq("session_id", sessionId)
-      .maybeSingle(),
-    supabase
-      .from("profiles")
-      .select("first_name")
-      .eq("id", athlete.coach_id)
-      .maybeSingle(),
-  ]);
+  const [{ data: checkIn }, { data: coach }, { data: sessionLog }] =
+    await Promise.all([
+      supabase
+        .from("session_check_ins")
+        .select("id")
+        .eq("athlete_id", athlete.id)
+        .eq("session_id", sessionId)
+        .maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("first_name")
+        .eq("id", athlete.coach_id)
+        .maybeSingle(),
+      supabase
+        .from("session_logs")
+        .select("started_at, status")
+        .eq("athlete_id", athlete.id)
+        .eq("session_id", sessionId)
+        .maybeSingle(),
+    ]);
 
   if (!checkIn) {
     return (
@@ -44,6 +52,15 @@ export default async function SeancePage({ params }: Props) {
         sessionId={sessionId}
         sessionTitle={session.title}
         coachFirstName={coach?.first_name || "ton coach"}
+      />
+    );
+  }
+
+  if (!sessionLog?.started_at && sessionLog?.status !== "completed") {
+    return (
+      <SessionStartTimeForm
+        sessionId={sessionId}
+        sessionTitle={session.title}
       />
     );
   }

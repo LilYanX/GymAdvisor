@@ -16,6 +16,7 @@ import {
   unlinkFromSupersetLocal,
 } from "@/lib/editor-draft";
 import {
+  copyProgramWeek,
   ensureDraftWeek,
   publishWeek,
   syncWeekDraft,
@@ -31,7 +32,7 @@ import {
   weekdayLabel,
 } from "@/lib/labels";
 import type { SessionType, TargetUnit } from "@/lib/supabase/models";
-import { IconPlus, IconTrash } from "@/components/icons";
+import { IconCopy, IconPlus, IconTrash } from "@/components/icons";
 import { ExerciseMedia } from "@/components/media/ExerciseMedia";
 import { useLoading } from "@/components/layout/LoadingProvider";
 
@@ -150,15 +151,23 @@ export function ProgramEditor({
   const [draftWeek, setDraftWeek] = useState<EditorWeek | null>(data.week);
   const [dirty, setDirty] = useState(false);
   const [insertSessionId, setInsertSessionId] = useState<string | null>(null);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [sourceWeek, setSourceWeek] = useState<number | "">("");
+  const [copying, startCopy] = useTransition();
   const libraryScrollRef = useRef<HTMLDivElement>(null);
   const sessionScrollRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const week = data.week;
   const editorWeek = draftWeek ?? week;
+  const sourceWeekOptions = data.availableWeeks.filter(
+    (weekNumber) => weekNumber !== data.weekNumber,
+  );
 
   useEffect(() => {
     setDraftWeek(week);
     setDirty(false);
+    setCopyOpen(false);
+    setSourceWeek("");
   }, [data.weekNumber, data.athlete.id, week?.id]);
 
   useEffect(() => {
@@ -320,6 +329,105 @@ export function ProgramEditor({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              type="button"
+              disabled={sourceWeekOptions.length === 0 || copying}
+              aria-label="Copier une semaine existante"
+              title={
+                sourceWeekOptions.length === 0
+                  ? "Aucune autre semaine à copier"
+                  : "Copier une semaine existante"
+              }
+              onClick={() => {
+                setError(null);
+                setCopyOpen((current) => !current);
+                if (sourceWeek === "" && sourceWeekOptions.length > 0) {
+                  setSourceWeek(sourceWeekOptions[sourceWeekOptions.length - 1]);
+                }
+              }}
+              className="inline-flex items-center justify-center rounded-lg bg-ga-elevated p-2 text-ga-muted hover:text-ga-fg disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <IconCopy className="h-4 w-4" />
+            </button>
+            {copyOpen ? (
+              <div className="absolute right-0 z-20 mt-2 w-64 rounded-xl border border-ga-border bg-ga-card p-3 shadow-lg">
+                <p className="text-xs text-ga-muted">
+                  Remplace le contenu de la semaine {data.weekNumber} par une
+                  copie d’une semaine déjà créée.
+                </p>
+                <label className="mt-3 block text-xs text-ga-muted">
+                  Semaine source
+                  <select
+                    value={sourceWeek === "" ? "" : String(sourceWeek)}
+                    onChange={(event) =>
+                      setSourceWeek(
+                        event.target.value === ""
+                          ? ""
+                          : Number(event.target.value),
+                      )
+                    }
+                    className="mt-1 w-full rounded-lg border border-ga-border bg-ga-elevated px-2 py-1.5 text-sm text-ga-fg outline-none focus:border-ga-lime"
+                  >
+                    <option value="" disabled>
+                      Choisir…
+                    </option>
+                    {sourceWeekOptions.map((weekNumber) => (
+                      <option key={weekNumber} value={weekNumber}>
+                        Semaine {weekNumber}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCopyOpen(false)}
+                    className="flex-1 rounded-lg border border-ga-border px-2 py-1.5 text-xs text-ga-muted hover:text-ga-fg"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sourceWeek === "" || copying}
+                    onClick={() => {
+                      if (sourceWeek === "") return;
+                      const hasContent =
+                        (editorWeek?.sessions.length ?? 0) > 0;
+                      if (
+                        hasContent &&
+                        !window.confirm(
+                          `Remplacer le contenu de la semaine ${data.weekNumber} par la semaine ${sourceWeek} ?`,
+                        )
+                      ) {
+                        return;
+                      }
+                      setError(null);
+                      setLoading(true);
+                      startCopy(async () => {
+                        const result = await copyProgramWeek({
+                          athleteId: data.athlete.id,
+                          sourceWeekNumber: sourceWeek,
+                          targetWeekNumber: data.weekNumber,
+                        });
+                        setLoading(false);
+                        if (result.error) {
+                          setError(result.error);
+                          return;
+                        }
+                        setCopyOpen(false);
+                        setDirty(false);
+                        router.refresh();
+                      });
+                    }}
+                    className="flex-1 rounded-lg bg-ga-lime px-2 py-1.5 text-xs font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
+                  >
+                    {copying ? "Copie…" : "Copier"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
           <Link
             href={`/editeur?athlete=${data.athlete.id}&week=${Math.max(1, data.weekNumber - 1)}`}
             className="rounded-lg bg-ga-elevated px-3 py-1.5 text-sm text-ga-muted hover:text-ga-fg"

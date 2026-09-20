@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { syncAthleteCurrentWeek } from "@/lib/athlete-week-sync";
 import {
   currentMonthLabel,
   firstOfMonthISO,
@@ -71,8 +72,8 @@ export async function getDashboardData(coachId: string): Promise<DashboardData> 
     throw new Error(athletesError.message);
   }
 
-  const athletes = (athletesData ?? []) as Athlete[];
-  if (athletes.length === 0) {
+  const athletesRaw = (athletesData ?? []) as Athlete[];
+  if (athletesRaw.length === 0) {
     return {
       athletes: [],
       todos: [],
@@ -80,6 +81,9 @@ export async function getDashboardData(coachId: string): Promise<DashboardData> 
     };
   }
 
+  const athletes = await Promise.all(
+    athletesRaw.map((athlete) => syncAthleteCurrentWeek(athlete)),
+  );
   const athleteIds = athletes.map((athlete) => athlete.id);
 
   const [

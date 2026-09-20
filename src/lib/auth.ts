@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { syncAthleteCurrentWeek } from "@/lib/athlete-week-sync";
 import type { Athlete, Profile } from "@/lib/supabase/models";
 
 export async function getAuthProfile(): Promise<{
@@ -45,5 +46,10 @@ export async function requireAthlete(): Promise<{
     .eq("profile_id", session.profile.id)
     .maybeSingle();
 
-  return { profile: session.profile, athlete };
+  if (!athlete) {
+    return { profile: session.profile, athlete: null };
+  }
+
+  const synced = await syncAthleteCurrentWeek(athlete as Athlete);
+  return { profile: session.profile, athlete: synced };
 }

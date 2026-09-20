@@ -1,6 +1,8 @@
 import { requireAthlete } from "@/lib/auth";
 import { signOut } from "@/lib/actions/auth";
+import { getAthleteDashboardBundle } from "@/lib/dashboard-metrics";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { AthleteMetricsDashboard } from "@/components/dashboard/AthleteMetricsDashboard";
 
 function initials(firstName: string, lastName: string): string {
   const a = firstName.trim().charAt(0);
@@ -20,6 +22,8 @@ export default async function MoiPage() {
           Math.round((athlete.current_week / athlete.total_weeks) * 100),
         )
       : 0;
+
+  const dashboard = await getAthleteDashboardBundle(athlete.id);
 
   return (
     <div className="px-5 pb-24 pt-8">
@@ -74,6 +78,10 @@ export default async function MoiPage() {
           </div>
         </div>
       </section>
+
+      <div className="mt-4">
+        <AthleteMetricsDashboard bundle={dashboard} variant="athlete" />
+      </div>
 
       <section className="mt-4 overflow-hidden rounded-2xl border border-ga-border bg-ga-card">
         <div className="flex items-center justify-between gap-3 px-4 py-3.5">

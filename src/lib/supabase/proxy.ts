@@ -49,6 +49,8 @@ export async function updateSession(request: NextRequest) {
     path === "/login" ||
     path.startsWith("/login/") ||
     path === "/acces-refuse" ||
+    path === "/cgu" ||
+    path === "/rgpd" ||
     path.startsWith("/auth/");
 
   if (!user && !isPublic) {

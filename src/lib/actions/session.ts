@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { requireAthlete } from "@/lib/auth";
 import { loggingRepsForExercise } from "@/lib/athlete-sets";
+import {
+  assertEndAfterStart,
+  parseDatetimeLocal,
+} from "@/lib/session-timing";
 import { createClient } from "@/lib/supabase/server";
 
 function refresh() {
@@ -25,22 +29,27 @@ export async function startSession(sessionId: string) {
 
   const { data: existingLog } = await supabase
     .from("session_logs")
-    .select("status")
+    .select("status, started_at")
     .eq("session_id", sessionId)
     .eq("athlete_id", owned.athlete.id)
     .maybeSingle();
 
   if (existingLog?.status !== "completed" && existingLog?.status !== "skipped") {
-    const { error } = await supabase.from("session_logs").upsert(
-      {
+    if (existingLog) {
+      const { error } = await supabase
+        .from("session_logs")
+        .update({ status: "in_progress" })
+        .eq("session_id", sessionId)
+        .eq("athlete_id", owned.athlete.id);
+      if (error) return { error: error.message };
+    } else {
+      const { error } = await supabase.from("session_logs").insert({
         session_id: sessionId,
         athlete_id: owned.athlete.id,
         status: "in_progress",
-        started_at: new Date().toISOString(),
-      },
-      { onConflict: "session_id" },
-    );
-    if (error) return { error: error.message };
+      });
+      if (error) return { error: error.message };
+    }
   }
 
   const { data: items } = await supabase
@@ -181,22 +190,70 @@ export async function saveExerciseFeedback(input: {
   return { error: null };
 }
 
-export async function completeSession(sessionId: string) {
+export async function completeSession(
+  sessionId: string,
+  completedAtLocal: string,
+) {
   const owned = await athleteOrError();
   if (owned.error || !owned.athlete) return { error: owned.error ?? "Erreur." };
   const supabase = await createClient();
 
+  const endDate = parseDatetimeLocal(completedAtLocal);
+  if (!endDate) {
+    return { error: "Indique une heure de fin valide." };
+  }
+
+  const { data: log } = await supabase
+    .from("session_logs")
+    .select("started_at")
+    .eq("session_id", sessionId)
+    .eq("athlete_id", owned.athlete.id)
+    .maybeSingle();
+
+  if (!log?.started_at) {
+    return { error: "L’heure de début de séance est manquante." };
+  }
+
+  const completedAt = endDate.toISOString();
+  const timingError = assertEndAfterStart(log.started_at, completedAt);
+  if (timingError) return { error: timingError };
+
+  const { error } = await supabase
+    .from("session_logs")
+    .update({
+      status: "completed",
+      completed_at: completedAt,
+    })
+    .eq("session_id", sessionId)
+    .eq("athlete_id", owned.athlete.id);
+  if (error) return { error: error.message };
+  refresh();
+  return { error: null };
+}
+
+export async function setSessionStartedAt(
+  sessionId: string,
+  startedAtLocal: string,
+) {
+  const owned = await athleteOrError();
+  if (owned.error || !owned.athlete) return { error: owned.error ?? "Erreur." };
+
+  const startedDate = parseDatetimeLocal(startedAtLocal);
+  if (!startedDate) return { error: "Indique une heure de début valide." };
+
+  const supabase = await createClient();
   const { error } = await supabase.from("session_logs").upsert(
     {
       session_id: sessionId,
       athlete_id: owned.athlete.id,
-      status: "completed",
-      completed_at: new Date().toISOString(),
+      status: "in_progress",
+      started_at: startedDate.toISOString(),
     },
     { onConflict: "session_id" },
   );
   if (error) return { error: error.message };
   refresh();
+  revalidatePath(`/app/seance/${sessionId}`);
   return { error: null };
 }
 

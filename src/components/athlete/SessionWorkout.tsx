@@ -17,6 +17,7 @@ import {
   type WorkoutGroup,
 } from "@/lib/workout-groups";
 import { formatPrescriptionQuantity } from "@/lib/labels";
+import { toDatetimeLocalValue } from "@/lib/session-timing";
 
 type SetDraft = {
   set_number: number;
@@ -273,6 +274,8 @@ export function SessionWorkout({
   const [advancing, setAdvancing] = useState(false);
   useLoadingActive(advancing);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const [endedAt, setEndedAt] = useState(toDatetimeLocalValue);
 
   const group = groups[index];
   const total = groups.length;
@@ -323,13 +326,7 @@ export function SessionWorkout({
       }
 
       if (index + 1 >= total) {
-        const done = await completeSession(session.id);
-        if (done.error) {
-          setError(done.error);
-          return;
-        }
-        router.push("/app");
-        router.refresh();
+        setConfirmingEnd(true);
         return;
       }
 
@@ -337,6 +334,66 @@ export function SessionWorkout({
     } finally {
       setAdvancing(false);
     }
+  }
+
+  async function finishSession() {
+    setError(null);
+    setAdvancing(true);
+    try {
+      const done = await completeSession(session.id, endedAt);
+      if (done.error) {
+        setError(done.error);
+        return;
+      }
+      router.push("/app");
+      router.refresh();
+    } finally {
+      setAdvancing(false);
+    }
+  }
+
+  if (confirmingEnd) {
+    return (
+      <>
+        <div className="px-5 pb-32 pt-8">
+          <p className="text-sm text-ga-muted">{session.title}</p>
+          <h1 className="mt-1 text-2xl font-semibold">Heure de fin</h1>
+          <label className="mt-8 block text-sm">
+            <span className="font-medium">Fin de séance</span>
+            <input
+              type="datetime-local"
+              value={endedAt}
+              onChange={(event) => setEndedAt(event.target.value)}
+              className="mt-2 w-full rounded-xl border border-ga-border bg-ga-elevated px-3 py-2.5 text-sm outline-none focus:border-ga-lime"
+            />
+          </label>
+          {error ? <p className="mt-4 text-sm text-ga-red">{error}</p> : null}
+        </div>
+        <FixedBottomBar offsetClass="bottom-14" variant="athlete">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={advancing}
+              onClick={() => {
+                setConfirmingEnd(false);
+                setError(null);
+              }}
+              className="shrink-0 rounded-xl border border-ga-border bg-ga-elevated px-4 py-3 text-sm font-medium text-ga-fg disabled:opacity-60"
+            >
+              Retour
+            </button>
+            <button
+              type="button"
+              disabled={advancing}
+              onClick={finishSession}
+              className="min-w-0 flex-1 rounded-xl bg-ga-lime py-3 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
+            >
+              {advancing ? "Enregistrement…" : "Valider et terminer"}
+            </button>
+          </div>
+        </FixedBottomBar>
+      </>
+    );
   }
 
   const stepLabel =

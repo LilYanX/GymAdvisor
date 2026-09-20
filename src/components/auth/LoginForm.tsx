@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/icons";
@@ -8,6 +9,8 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { useLoading } from "@/components/layout/LoadingProvider";
 
 type Mode = "login" | "reset";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function LoginForm() {
   const router = useRouter();
@@ -39,12 +42,28 @@ export function LoginForm() {
     event.preventDefault();
     setError(null);
     setInfo(null);
-    setPending(true);
-    setLoading(true);
 
     const form = new FormData(event.currentTarget);
-    const email = String(form.get("email") ?? "").trim();
+    // Honeypot anti-spam : les bots remplissent souvent ce champ caché
+    if (String(form.get("company_url") ?? "").trim()) {
+      setInfo("Si un compte existe avec cet e-mail, tu recevras un lien.");
+      return;
+    }
+
+    const email = String(form.get("email") ?? "").trim().toLowerCase();
     const password = String(form.get("password") ?? "");
+
+    if (!EMAIL_RE.test(email)) {
+      setError("Indique une adresse e-mail valide.");
+      return;
+    }
+    if (mode === "login" && password.length < 6) {
+      setError("Le mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
+
+    setPending(true);
+    setLoading(true);
     const supabase = createClient();
 
     try {
@@ -95,13 +114,22 @@ export function LoginForm() {
           <ThemeToggle />
         </div>
         <h1 className="mt-8 text-2xl font-semibold">{title}</h1>
-        <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
+        <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4" noValidate>
+          <input
+            type="text"
+            name="company_url"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden
+            className="pointer-events-none absolute left-[-9999px] h-0 w-0 opacity-0"
+          />
           <label className="text-sm">
             <span className="mb-1.5 block text-ga-muted">E-mail</span>
             <input
               name="email"
               type="email"
               required
+              inputMode="email"
               autoComplete="email"
               className="w-full rounded-lg border border-ga-border bg-ga-card px-3 py-2 outline-none focus:border-ga-lime"
             />
@@ -149,6 +177,15 @@ export function LoginForm() {
             </button>
           </div>
         ) : null}
+        <p className="mt-10 text-center text-xs text-ga-muted">
+          <Link href="/cgu" className="hover:text-ga-fg">
+            CGU
+          </Link>
+          {" · "}
+          <Link href="/rgpd" className="hover:text-ga-fg">
+            Confidentialité
+          </Link>
+        </p>
       </div>
     </main>
   );

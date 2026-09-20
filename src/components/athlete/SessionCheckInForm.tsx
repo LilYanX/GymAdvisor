@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   submitSessionCheckIn,
   type SessionCheckInState,
 } from "@/lib/actions/session-checkin";
+import { toDatetimeLocalValue } from "@/lib/session-timing";
 import { FixedBottomBar } from "@/components/layout/FixedBottomBar";
 import { useLoadingActive } from "@/components/layout/LoadingProvider";
 
@@ -52,6 +53,7 @@ export function SessionCheckInForm({
 }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(submitSessionCheckIn, initial);
+  const [startedAt, setStartedAt] = useState(toDatetimeLocalValue);
   useLoadingActive(pending);
 
   useEffect(() => {
@@ -63,9 +65,24 @@ export function SessionCheckInForm({
       <div className="px-5 pb-32 pt-8">
         <p className="text-sm text-ga-muted">{sessionTitle}</p>
         <h1 className="mt-1 text-2xl font-semibold">Comment tu te sens ?</h1>
-        
-        <form id="session-checkin-form" action={action} className="mt-8 flex flex-col gap-6">
+
+        <form
+          id="session-checkin-form"
+          action={action}
+          className="mt-8 flex flex-col gap-6"
+        >
           <input type="hidden" name="session_id" value={sessionId} />
+          <label className="text-sm">
+            <span className="font-medium">Heure de début</span>
+            <input
+              type="datetime-local"
+              name="started_at"
+              required
+              value={startedAt}
+              onChange={(event) => setStartedAt(event.target.value)}
+              className="mt-2 w-full rounded-xl border border-ga-border bg-ga-elevated px-3 py-2.5 text-sm outline-none focus:border-ga-lime"
+            />
+          </label>
           <Scale name="energy" label="Énergie" />
           <Scale name="sleep" label="Sommeil" />
           <Scale name="pain" label="Douleurs" />
@@ -78,7 +95,9 @@ export function SessionCheckInForm({
               className="mt-2 w-full rounded-xl border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
             />
           </label>
-          {state.error ? <p className="text-sm text-ga-red">{state.error}</p> : null}
+          {state.error ? (
+            <p className="text-sm text-ga-red">{state.error}</p>
+          ) : null}
         </form>
       </div>
 

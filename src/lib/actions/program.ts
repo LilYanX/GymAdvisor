@@ -64,6 +64,150 @@ export async function ensureDraftWeek(athleteId: string, weekNumber: number) {
   return { error: null, weekId: data.id };
 }
 
+/** Copie le contenu d'une semaine source dans la semaine cible (remplace les jours existants). */
+export async function copyProgramWeek(input: {
+  athleteId: string;
+  sourceWeekNumber: number;
+  targetWeekNumber: number;
+}): Promise<{ error: string | null }> {
+  const { athleteId, sourceWeekNumber, targetWeekNumber } = input;
+  if (sourceWeekNumber === targetWeekNumber) {
+    return { error: "Choisis une semaine source différente de la semaine actuelle." };
+  }
+  if (sourceWeekNumber < 1 || targetWeekNumber < 1) {
+    return { error: "Numéro de semaine invalide." };
+  }
+
+  const owned = await getOwnedAthlete(athleteId);
+  if (owned.error || !owned.athlete) return { error: owned.error ?? "Erreur." };
+  const { supabase } = owned;
+
+  const { data: sourceWeek } = await supabase
+    .from("program_weeks")
+    .select("id")
+    .eq("athlete_id", athleteId)
+    .eq("week_number", sourceWeekNumber)
+    .maybeSingle();
+  if (!sourceWeek) return { error: "La semaine source est introuvable." };
+
+  const { data: sourceSessions } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("program_week_id", sourceWeek.id)
+    .order("weekday");
+
+  const sourceSessionRows = sourceSessions ?? [];
+  if (sourceSessionRows.length === 0) {
+    return { error: "La semaine source n’a aucun jour à copier." };
+  }
+
+  const sourceSessionIds = sourceSessionRows.map((session) => session.id);
+  const { data: sourceExercises } = await supabase
+    .from("session_exercises")
+    .select("*")
+    .in("session_id", sourceSessionIds)
+    .order("sort_order");
+
+  let targetWeekId: string;
+  const { data: existingTarget } = await supabase
+    .from("program_weeks")
+    .select("id")
+    .eq("athlete_id", athleteId)
+    .eq("week_number", targetWeekNumber)
+    .maybeSingle();
+
+  if (existingTarget) {
+    targetWeekId = existingTarget.id;
+    const { error: clearError } = await supabase
+      .from("sessions")
+      .delete()
+      .eq("program_week_id", targetWeekId);
+    if (clearError) return { error: clearError.message };
+  } else {
+    const { data: created, error: createError } = await supabase
+      .from("program_weeks")
+      .insert({
+        athlete_id: athleteId,
+        week_number: targetWeekNumber,
+        status: "draft",
+      })
+      .select("id")
+      .single();
+    if (createError || !created) {
+      return { error: createError?.message ?? "Impossible de créer la semaine cible." };
+    }
+    targetWeekId = created.id;
+  }
+
+  const groupIdMap = new Map<string, string>();
+
+  for (const session of sourceSessionRows) {
+    const { data: newSession, error: sessionError } = await supabase
+      .from("sessions")
+      .insert({
+        program_week_id: targetWeekId,
+        weekday: session.weekday,
+        title: session.title,
+        session_type: session.session_type,
+        rest_details: session.rest_details,
+        suggested_time: session.suggested_time,
+        estimated_minutes: session.estimated_minutes,
+        sort_order: session.sort_order,
+        scheduled_date: null,
+      })
+      .select("id")
+      .single();
+    if (sessionError || !newSession) {
+      return { error: sessionError?.message ?? "Impossible de copier un jour." };
+    }
+
+    const exercises = (sourceExercises ?? []).filter(
+      (item) => item.session_id === session.id,
+    );
+    if (exercises.length === 0) continue;
+
+    const rows = exercises.map((exercise) => {
+      let groupId = exercise.superset_group_id;
+      if (groupId) {
+        if (!groupIdMap.has(groupId)) {
+          groupIdMap.set(groupId, crypto.randomUUID());
+        }
+        groupId = groupIdMap.get(groupId)!;
+      }
+      return {
+        session_id: newSession.id,
+        exercise_id: exercise.exercise_id,
+        sort_order: exercise.sort_order,
+        sets_count: exercise.sets_count,
+        target_reps: exercise.target_reps,
+        target_unit: exercise.target_unit ?? "reps",
+        target_secondary_reps: exercise.target_secondary_reps ?? null,
+        target_weight_kg: exercise.target_weight_kg,
+        target_percent: exercise.target_percent,
+        target_rpe: exercise.target_rpe,
+        rest_seconds: sanitizeRestSeconds(exercise.rest_seconds),
+        tempo: exercise.tempo ?? "",
+        coach_note: exercise.coach_note,
+        superset_group_id: groupId,
+      };
+    });
+
+    const { error: exercisesError } = await supabase
+      .from("session_exercises")
+      .insert(rows);
+    if (exercisesError) return { error: exercisesError.message };
+  }
+
+  const { error: statusError } = await supabase
+    .from("program_weeks")
+    .update({ status: "draft", published_at: null })
+    .eq("id", targetWeekId);
+  if (statusError) return { error: statusError.message };
+
+  revalidateEditor();
+  return { error: null };
+}
+
 export async function addSession(weekId: string, weekday: number, title: string) {
   const { profile } = await requireCoach();
   const supabase = await createClient();

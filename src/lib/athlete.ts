@@ -126,6 +126,60 @@ async function loadWeekDays(
   return { week, days };
 }
 
+/** Séances non terminées des semaines publiées antérieures (rattrapage). */
+async function loadPastOverdue(
+  athlete: Athlete,
+  today: string,
+): Promise<AthleteDay | null> {
+  const supabase = await createClient();
+  const { data: weeks } = await supabase
+    .from("program_weeks")
+    .select("id, week_number")
+    .eq("athlete_id", athlete.id)
+    .eq("status", "published")
+    .lt("week_number", athlete.current_week)
+    .order("week_number", { ascending: false });
+
+  const pastWeeks = weeks ?? [];
+  if (pastWeeks.length === 0) return null;
+
+  const weekIds = pastWeeks.map((week) => week.id);
+  const { data: sessions } = await supabase
+    .from("sessions")
+    .select("*")
+    .in("program_week_id", weekIds)
+    .in("session_type", ["workout", "optional"])
+    .lt("scheduled_date", today)
+    .order("scheduled_date", { ascending: false });
+
+  const sessionRows = (sessions ?? []) as Session[];
+  if (sessionRows.length === 0) return null;
+
+  const sessionIds = sessionRows.map((session) => session.id);
+  const { data: logs } = await supabase
+    .from("session_logs")
+    .select("*")
+    .eq("athlete_id", athlete.id)
+    .in("session_id", sessionIds);
+
+  const logBySession = new Map(
+    ((logs ?? []) as SessionLog[]).map((log) => [log.session_id, log]),
+  );
+
+  for (const session of sessionRows) {
+    const log = logBySession.get(session.id) ?? null;
+    if (log?.status === "completed" || log?.status === "skipped") continue;
+    const view: AthleteSessionView = {
+      ...session,
+      log,
+      exercises: [],
+    };
+    return { session: view, kind: "missed" };
+  }
+
+  return null;
+}
+
 export async function getAthleteProgram(
   athlete: Athlete,
 ): Promise<AthleteProgram> {
@@ -141,7 +195,7 @@ export async function getAthleteProgram(
 
   const { week, days } = await loadWeekDays(athlete);
   const todayDay = days.find((day) => isToday(day.session, today)) ?? null;
-  const overdue =
+  const overdueCurrent =
     days.find(
       (day) =>
         isTrackableSession(day.session) &&
@@ -150,6 +204,10 @@ export async function getAthleteProgram(
     ) ??
     days.find((day) => day.kind === "missed") ??
     null;
+  const overduePast = overdueCurrent
+    ? null
+    : await loadPastOverdue(athlete, today);
+  const overdue = overdueCurrent ?? overduePast;
 
   const programJustPublished = Boolean(
     week?.published_at &&

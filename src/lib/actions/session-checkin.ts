@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAthlete } from "@/lib/auth";
+import { parseDatetimeLocal } from "@/lib/session-timing";
 import { createClient } from "@/lib/supabase/server";
 
 export type SessionCheckInState = {
@@ -38,6 +39,7 @@ export async function submitSessionCheckIn(
   const pain = Number(formData.get("pain"));
   const motivation = Number(formData.get("motivation"));
   const comment = String(formData.get("comment") ?? "").trim();
+  const startedAtLocal = String(formData.get("started_at") ?? "").trim();
 
   if (!sessionId) {
     return { error: "Séance introuvable.", ok: false };
@@ -52,6 +54,11 @@ export async function submitSessionCheckIn(
       error: "Indique énergie, sommeil, douleurs et motivation (1 à 5).",
       ok: false,
     };
+  }
+
+  const startedDate = parseDatetimeLocal(startedAtLocal);
+  if (!startedDate) {
+    return { error: "Indique l’heure de début de séance.", ok: false };
   }
 
   const supabase = await createClient();
@@ -72,6 +79,17 @@ export async function submitSessionCheckIn(
   );
 
   if (error) return { error: error.message, ok: false };
+
+  const { error: logError } = await supabase.from("session_logs").upsert(
+    {
+      session_id: sessionId,
+      athlete_id: athlete.id,
+      status: "in_progress",
+      started_at: startedDate.toISOString(),
+    },
+    { onConflict: "session_id" },
+  );
+  if (logError) return { error: logError.message, ok: false };
 
   revalidatePath(`/app/seance/${sessionId}`);
   revalidatePath("/app");
