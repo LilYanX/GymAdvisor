@@ -18,7 +18,6 @@ export default function OpenGraphImage() {
           padding: 64,
           background: "#0b0b0c",
           color: "#ececee",
-          fontFamily: "sans-serif",
         }}
       >
         <div
@@ -40,27 +39,41 @@ export default function OpenGraphImage() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              color: "#c8f135",
+              fontSize: 22,
+              fontWeight: 700,
             }}
           >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M3 12h4l2-7 4 14 2-7h6"
-                stroke="#c8f135"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            GA
           </div>
-          {SITE_NAME}
+          <div style={{ display: "flex" }}>{SITE_NAME}</div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ fontSize: 56, fontWeight: 700, lineHeight: 1.1 }}>
-            Coaching sportif,
-            <br />
-            suivi à distance
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              fontSize: 56,
+              fontWeight: 700,
+              lineHeight: 1.15,
+            }}
+          >
+            <div style={{ display: "flex" }}>Coaching sportif,</div>
+            <div style={{ display: "flex" }}>suivi à distance</div>
           </div>
-          <div style={{ fontSize: 24, color: "#8a8a93" }}>
+          <div
+            style={{
+              display: "flex",
+              fontSize: 24,
+              color: "#8a8a93",
+            }}
+          >
             Programmes, ressentis et charges pour coachs & sportifs
           </div>
         </div>
