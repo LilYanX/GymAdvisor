@@ -12,9 +12,11 @@ import {
 import { setPaymentStatus } from "@/lib/actions/payments";
 import type { AthleteFollowUp } from "@/lib/athlete-followup-types";
 import type { AthleteDashboardBundle } from "@/lib/dashboard-metrics";
+import type { AthleteBodyLog } from "@/lib/supabase/models";
 import { formatFeedbackDate } from "@/lib/dates";
 import { PAYMENT_DISPLAY_LABELS } from "@/lib/payments";
 import { AthleteMetricsDashboard } from "@/components/dashboard/AthleteMetricsDashboard";
+import { WeightChart } from "@/components/athlete/WeightChart";
 
 function monthLabel(): string {
   return new Intl.DateTimeFormat("fr-FR", { month: "long" }).format(new Date());
@@ -25,9 +27,11 @@ const initial: AthleteFormState = { error: null };
 export function AthleteDetailView({
   data,
   dashboard,
+  bodyLogs = [],
 }: {
   data: AthleteFollowUp;
   dashboard: AthleteDashboardBundle;
+  bodyLogs?: AthleteBodyLog[];
 }) {
   const router = useRouter();
   const { athlete } = data;
@@ -63,6 +67,13 @@ export function AthleteDetailView({
         exportHrefBase={`/sportifs/${athlete.id}/dashboard.xlsx`}
         variant="coach"
       />
+
+      <section className="rounded-xl border border-ga-border bg-ga-card p-4 md:p-5">
+        <h2 className="text-lg font-semibold">Courbe de poids</h2>
+        <div className="mt-4">
+          <WeightChart logs={bodyLogs} />
+        </div>
+      </section>
 
       <div className="grid items-start gap-4 xl:grid-cols-12">
         <form
@@ -106,6 +117,22 @@ export function AthleteDetailView({
               className="mt-1 w-full rounded-lg border border-ga-border bg-ga-elevated px-2.5 py-1.5 text-sm outline-none focus:border-ga-lime"
             />
           </label>
+          <div className="text-xs text-ga-muted">
+            Taille
+            <p className="mt-1 rounded-lg border border-ga-border/60 bg-ga-elevated/50 px-2.5 py-1.5 text-sm text-ga-fg">
+              {athlete.height_cm != null
+                ? `${athlete.height_cm.toLocaleString("fr-FR")} cm`
+                : "—"}
+            </p>
+          </div>
+          <div className="text-xs text-ga-muted">
+            Poids (dernier)
+            <p className="mt-1 rounded-lg border border-ga-border/60 bg-ga-elevated/50 px-2.5 py-1.5 text-sm text-ga-fg">
+              {bodyLogs.length > 0
+                ? `${bodyLogs[bodyLogs.length - 1].weight_kg.toLocaleString("fr-FR")} kg`
+                : "—"}
+            </p>
+          </div>
           <label className="text-xs text-ga-muted">
             Semaine
             <input
@@ -254,7 +281,7 @@ export function AthleteDetailView({
 
           <section className="rounded-xl border border-ga-border bg-ga-card p-4">
             <h2 className="text-sm font-semibold">Charge cumulée</h2>
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
               <div className="rounded-lg bg-ga-elevated p-2.5">
                 <p className="text-[10px] uppercase tracking-wide text-ga-muted">
                   Tonnage
@@ -266,10 +293,18 @@ export function AthleteDetailView({
               </div>
               <div className="rounded-lg bg-ga-elevated p-2.5">
                 <p className="text-[10px] uppercase tracking-wide text-ga-muted">
-                  U.A. (min × RPE/10)
+                  UA moy.
                 </p>
                 <p className="mt-0.5 text-lg font-semibold">
                   {data.totals.loadUnits.toLocaleString("fr-FR")}
+                </p>
+              </div>
+              <div className="rounded-lg bg-ga-elevated p-2.5">
+                <p className="text-[10px] uppercase tracking-wide text-ga-muted">
+                  UA final
+                </p>
+                <p className="mt-0.5 text-lg font-semibold">
+                  {data.totals.loadUnitsFinal.toLocaleString("fr-FR")}
                 </p>
               </div>
             </div>
@@ -318,7 +353,8 @@ export function AthleteDetailView({
                     <th className="px-3 py-2 font-medium">Séance</th>
                     <th className="px-3 py-2 font-medium">Date</th>
                     <th className="px-3 py-2 font-medium">kg</th>
-                    <th className="px-3 py-2 font-medium">u.a.</th>
+                    <th className="px-3 py-2 font-medium">UA moy.</th>
+                    <th className="px-3 py-2 font-medium">UA final</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -335,6 +371,7 @@ export function AthleteDetailView({
                         {session.tonnageKg.toLocaleString("fr-FR")}
                       </td>
                       <td className="px-3 py-2">{session.loadUnits}</td>
+                      <td className="px-3 py-2">{session.loadUnitsFinal}</td>
                     </tr>
                   ))}
                 </tbody>

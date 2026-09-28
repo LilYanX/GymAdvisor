@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireCoach } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { validateOneRmFormula } from "@/lib/one-rm-formula";
 import type { MuscleGroup } from "@/lib/supabase/models";
 
 export type ExerciseFormState = {
@@ -36,12 +37,18 @@ export async function createExercise(
     .map((line) => line.trim())
     .filter(Boolean);
   const vigilancePoints = String(formData.get("vigilance_points") ?? "").trim();
+  const oneRmFormulaRaw = String(formData.get("one_rm_formula") ?? "").trim();
+  const oneRmFormula = oneRmFormulaRaw || null;
 
   if (!name) {
     return { error: "Le nom de l’exercice est obligatoire." };
   }
   if (!GROUPS.includes(muscleGroup)) {
     return { error: "Choisis un groupe musculaire." };
+  }
+  const formulaCheck = validateOneRmFormula(oneRmFormula);
+  if (!formulaCheck.ok) {
+    return { error: `Formule 1RM : ${formulaCheck.error}` };
   }
 
   const { error } = await supabase.from("exercises").insert({
@@ -51,6 +58,7 @@ export async function createExercise(
     video_url: videoUrl,
     cues,
     vigilance_points: vigilancePoints,
+    one_rm_formula: oneRmFormula,
   });
 
   if (error) {
@@ -103,11 +111,17 @@ export async function updateExercise(
     .map((line) => line.trim())
     .filter(Boolean);
   const vigilancePoints = String(formData.get("vigilance_points") ?? "").trim();
+  const oneRmFormulaRaw = String(formData.get("one_rm_formula") ?? "").trim();
+  const oneRmFormula = oneRmFormulaRaw || null;
 
   if (!exerciseId) return { error: "Exercice introuvable." };
   if (!name) return { error: "Le nom de l’exercice est obligatoire." };
   if (!GROUPS.includes(muscleGroup)) {
     return { error: "Choisis un groupe musculaire." };
+  }
+  const formulaCheck = validateOneRmFormula(oneRmFormula);
+  if (!formulaCheck.ok) {
+    return { error: `Formule 1RM : ${formulaCheck.error}` };
   }
 
   const { error } = await supabase
@@ -118,6 +132,7 @@ export async function updateExercise(
       video_url: videoUrl,
       cues,
       vigilance_points: vigilancePoints,
+      one_rm_formula: oneRmFormula,
     })
     .eq("id", exerciseId);
 

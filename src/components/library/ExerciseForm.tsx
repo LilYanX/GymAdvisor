@@ -125,6 +125,19 @@ export function ExerciseForm() {
           className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
         />
       </label>
+      <label className="min-w-0 text-sm sm:col-span-2 xl:col-span-3">
+        <span className="mb-1.5 block text-ga-muted">
+          Formule 1RM estimée (optionnel)
+        </span>
+        <input
+          name="one_rm_formula"
+          placeholder="ex. poids * (1 + reps / 30)"
+          className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 font-mono text-sm outline-none focus:border-ga-lime"
+        />
+        <span className="mt-1.5 block text-xs text-ga-muted">
+          Variables : poids (ou weight), reps. Opérateurs : + − × ÷ ( ).
+        </span>
+      </label>
       {uploadError || state.error ? (
         <p className="text-sm text-ga-red sm:col-span-2 xl:col-span-3">
           {uploadError ?? state.error}

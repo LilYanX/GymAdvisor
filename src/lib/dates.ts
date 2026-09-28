@@ -76,6 +76,15 @@ export function mondayOfWeekISO(isoDate: string = todayISO()): string {
   return addDaysISO(isoDate, 1 - isoWeekday(isoDate));
 }
 
+/** Accepte YYYY-MM-DD ou retombe sur aujourd’hui. */
+export function parseDashboardDate(
+  value: string | string[] | undefined | null,
+): string {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  return todayISO();
+}
+
 export function formatPeriodLabel(periodStart: string): string {
   const [year, month] = periodStart.split("-").map(Number);
   return capitalize(

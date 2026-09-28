@@ -13,9 +13,19 @@ type Props = {
 
 export async function GET(request: Request, { params }: Props) {
   const { id } = await params;
-  const periodParam = new URL(request.url).searchParams.get("period");
+  const url = new URL(request.url);
+  const periodParam = url.searchParams.get("period");
   const period: DashboardPeriod =
-    periodParam === "month" ? "month" : "week";
+    periodParam === "month"
+      ? "month"
+      : periodParam === "day"
+        ? "day"
+        : "week";
+  const dateParam = url.searchParams.get("date");
+  const referenceDate =
+    dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
+      ? dateParam
+      : undefined;
 
   const { profile } = await requireCoach();
   const supabase = await createClient();
@@ -28,7 +38,11 @@ export async function GET(request: Request, { params }: Props) {
 
   if (!athlete) notFound();
 
-  const metrics = await computeAthleteDashboard(athlete.id, period);
+  const metrics = await computeAthleteDashboard(
+    athlete.id,
+    period,
+    referenceDate,
+  );
   const name = `${athlete.first_name} ${athlete.last_name}`.trim();
   const buffer = await buildDashboardWorkbook(name, metrics);
   const filename = `suivi-${athlete.first_name.toLowerCase()}-${period}-${metrics.from}.xlsx`;

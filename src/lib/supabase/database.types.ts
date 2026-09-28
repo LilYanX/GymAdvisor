@@ -58,6 +58,7 @@ export type Database = {
           current_week: number;
           total_weeks: number;
           notes: string;
+          height_cm: number | null;
           archived_at: string | null;
           created_at: string;
           updated_at: string;
@@ -74,6 +75,7 @@ export type Database = {
           current_week?: number;
           total_weeks?: number;
           notes?: string;
+          height_cm?: number | null;
           archived_at?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -90,6 +92,7 @@ export type Database = {
           current_week?: number;
           total_weeks?: number;
           notes?: string;
+          height_cm?: number | null;
           archived_at?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -120,6 +123,7 @@ export type Database = {
           video_url: string | null;
           cues: string[];
           vigilance_points: string;
+          one_rm_formula: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -131,6 +135,7 @@ export type Database = {
           video_url?: string | null;
           cues?: string[];
           vigilance_points?: string;
+          one_rm_formula?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -142,6 +147,7 @@ export type Database = {
           video_url?: string | null;
           cues?: string[];
           vigilance_points?: string;
+          one_rm_formula?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -329,6 +335,7 @@ export type Database = {
           status: Database["public"]["Enums"]["session_log_status"];
           started_at: string | null;
           completed_at: string | null;
+          final_rpe: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -339,6 +346,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["session_log_status"];
           started_at?: string | null;
           completed_at?: string | null;
+          final_rpe?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -349,6 +357,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["session_log_status"];
           started_at?: string | null;
           completed_at?: string | null;
+          final_rpe?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -407,6 +416,38 @@ export type Database = {
           },
           {
             foreignKeyName: "session_exercise_logs_athlete_id_fkey";
+            columns: ["athlete_id"];
+            isOneToOne: false;
+            referencedRelation: "athletes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      athlete_body_logs: {
+        Row: {
+          id: string;
+          athlete_id: string;
+          recorded_on: string;
+          weight_kg: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          athlete_id: string;
+          recorded_on: string;
+          weight_kg: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          athlete_id?: string;
+          recorded_on?: string;
+          weight_kg?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "athlete_body_logs_athlete_id_fkey";
             columns: ["athlete_id"];
             isOneToOne: false;
             referencedRelation: "athletes";

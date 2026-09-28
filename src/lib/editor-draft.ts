@@ -85,6 +85,58 @@ export function addSessionLocal(
   };
 }
 
+/** Clone une séance vers un weekday libre (nouveaux IDs local:, remap supersets). */
+export function copySessionLocal(
+  week: EditorWeek,
+  sourceSessionId: string,
+  targetWeekday: number,
+): EditorWeek {
+  const source = week.sessions.find((session) => session.id === sourceSessionId);
+  if (!source) return week;
+  if (week.sessions.some((session) => session.weekday === targetWeekday)) {
+    return week;
+  }
+
+  const newSessionId = newLocalId();
+  const groupMap = new Map<string, string>();
+
+  const session_exercises: EditorSessionExercise[] = source.session_exercises.map(
+    (exercise, index) => {
+      let groupId = exercise.superset_group_id;
+      if (groupId) {
+        if (!groupMap.has(groupId)) groupMap.set(groupId, newLocalId());
+        groupId = groupMap.get(groupId)!;
+      }
+      return {
+        ...exercise,
+        id: newLocalId(),
+        session_id: newSessionId,
+        sort_order: index,
+        superset_group_id: groupId,
+        created_at: "",
+        updated_at: "",
+      };
+    },
+  );
+
+  const copied: EditorSession = {
+    ...source,
+    id: newSessionId,
+    program_week_id: week.id,
+    weekday: targetWeekday,
+    scheduled_date: null,
+    sort_order: targetWeekday,
+    created_at: "",
+    updated_at: "",
+    session_exercises,
+  };
+
+  return {
+    ...week,
+    sessions: [...week.sessions, copied].sort((a, b) => a.weekday - b.weekday),
+  };
+}
+
 export function deleteSessionLocal(week: EditorWeek, sessionId: string): EditorWeek {
   return {
     ...week,

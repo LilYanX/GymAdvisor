@@ -193,6 +193,7 @@ export async function saveExerciseFeedback(input: {
 export async function completeSession(
   sessionId: string,
   completedAtLocal: string,
+  finalRpe: number,
 ) {
   const owned = await athleteOrError();
   if (owned.error || !owned.athlete) return { error: owned.error ?? "Erreur." };
@@ -201,6 +202,13 @@ export async function completeSession(
   const endDate = parseDatetimeLocal(completedAtLocal);
   if (!endDate) {
     return { error: "Indique une heure de fin valide." };
+  }
+  if (
+    !Number.isInteger(finalRpe) ||
+    finalRpe < 1 ||
+    finalRpe > 10
+  ) {
+    return { error: "Indique un RPE final entre 1 et 10." };
   }
 
   const { data: log } = await supabase
@@ -223,6 +231,7 @@ export async function completeSession(
     .update({
       status: "completed",
       completed_at: completedAt,
+      final_rpe: finalRpe,
     })
     .eq("session_id", sessionId)
     .eq("athlete_id", owned.athlete.id);

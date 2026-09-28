@@ -59,6 +59,21 @@ src/proxy.ts             # session Auth + redirect HTTPS (prod)
 supabase/migrations/     # schéma & seeds
 ```
 
+## Export Excel / Dashboard BI
+
+L’export coach (`/sportifs/[id]/dashboard.xlsx`) produit un classeur avec :
+- onglet **Dashboard** (KPI + aperçus)
+- onglets **Ressenti**, **Charges UA**, **Charges par zone** (même structure de données)
+- tableaux Excel nommés (`TbRessentiSerie`, `TbChargesUA`, `TbZones`) adaptés au volume de lignes
+
+Pour un fichier BI avec **graphiques Excel natifs** à partir d’un export déjà téléchargé :
+
+```bash
+python scripts/generate-dashboard-bi.py "chemin/vers/suivi-….xlsx"
+```
+
+Sorties : `templates/GymAdvisor-Dashboard-BI.xlsx` et une copie dans `Downloads/`.
+
 ## Scripts npm
 
 | Commande | Rôle |

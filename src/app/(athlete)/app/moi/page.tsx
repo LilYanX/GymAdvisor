@@ -1,8 +1,11 @@
 import { requireAthlete } from "@/lib/auth";
 import { signOut } from "@/lib/actions/auth";
 import { getAthleteDashboardBundle } from "@/lib/dashboard-metrics";
+import { parseDashboardDate } from "@/lib/dates";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { AthleteMetricsDashboard } from "@/components/dashboard/AthleteMetricsDashboard";
+import { AthleteProfileEditor } from "@/components/athlete/AthleteProfileEditor";
+import { getAthleteBodyLogs } from "@/lib/actions/athlete-profile";
 
 function initials(firstName: string, lastName: string): string {
   const a = firstName.trim().charAt(0);
@@ -10,9 +13,16 @@ function initials(firstName: string, lastName: string): string {
   return `${a}${b}`.toUpperCase() || "?";
 }
 
-export default async function MoiPage() {
+type Props = {
+  searchParams: Promise<{ date?: string }>;
+};
+
+export default async function MoiPage({ searchParams }: Props) {
   const { athlete, profile } = await requireAthlete();
   if (!athlete) return null;
+
+  const params = await searchParams;
+  const referenceDate = parseDashboardDate(params.date);
 
   const name = `${athlete.first_name} ${athlete.last_name}`.trim();
   const progressPct =
@@ -23,7 +33,10 @@ export default async function MoiPage() {
         )
       : 0;
 
-  const dashboard = await getAthleteDashboardBundle(athlete.id);
+  const [dashboard, bodyLogs] = await Promise.all([
+    getAthleteDashboardBundle(athlete.id, referenceDate),
+    getAthleteBodyLogs(athlete.id),
+  ]);
 
   return (
     <div className="px-5 pb-24 pt-8">
@@ -45,17 +58,11 @@ export default async function MoiPage() {
         </div>
       </header>
 
-      <section className="mt-8 overflow-hidden rounded-2xl border border-ga-border bg-ga-card">
-        {athlete.goal ? (
-          <div className="border-b border-ga-border px-4 py-3.5">
-            <p className="text-xs uppercase tracking-wide text-ga-muted">
-              Objectif
-            </p>
-            <p className="mt-1 text-sm font-medium leading-relaxed text-ga-fg">
-              {athlete.goal}
-            </p>
-          </div>
-        ) : null}
+      <div className="mt-8">
+        <AthleteProfileEditor athlete={athlete} bodyLogs={bodyLogs} />
+      </div>
+
+      <section className="mt-4 overflow-hidden rounded-2xl border border-ga-border bg-ga-card">
         <div className="px-4 py-3.5">
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-xs uppercase tracking-wide text-ga-muted">

@@ -7,6 +7,7 @@ import type { EditorData, EditorSession, EditorSessionExercise, EditorWeek } fro
 import {
   addExerciseToSessionLocal,
   addSessionLocal,
+  copySessionLocal,
   deleteSessionLocal,
   insertTemplateIntoSessionLocal,
   linkSupersetWithPreviousLocal,
@@ -152,6 +153,7 @@ export function ProgramEditor({
   const [dirty, setDirty] = useState(false);
   const [insertSessionId, setInsertSessionId] = useState<string | null>(null);
   const [copyOpen, setCopyOpen] = useState(false);
+  const [copyDaySessionId, setCopyDaySessionId] = useState<string | null>(null);
   const [sourceWeek, setSourceWeek] = useState<number | "">("");
   const [copying, startCopy] = useTransition();
   const libraryScrollRef = useRef<HTMLDivElement>(null);
@@ -167,6 +169,7 @@ export function ProgramEditor({
     setDraftWeek(week);
     setDirty(false);
     setCopyOpen(false);
+    setCopyDaySessionId(null);
     setSourceWeek("");
   }, [data.weekNumber, data.athlete.id, week?.id]);
 
@@ -602,6 +605,56 @@ export function ProgramEditor({
                       }
                       className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none"
                     />
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        disabled={publishing || freeDays.length === 0}
+                        onClick={() =>
+                          setCopyDaySessionId((current) =>
+                            current === session.id ? null : session.id,
+                          )
+                        }
+                        className="text-ga-muted hover:text-ga-fg disabled:opacity-40"
+                        title={
+                          freeDays.length === 0
+                            ? "Aucun jour libre"
+                            : "Copier vers…"
+                        }
+                      >
+                        <IconCopy className="h-4 w-4" />
+                      </button>
+                      {copyDaySessionId === session.id && freeDays.length > 0 ? (
+                        <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-ga-border bg-ga-card p-2 shadow-lg">
+                          <p className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-ga-muted">
+                            Copier vers…
+                          </p>
+                          {freeDays.map((day) => (
+                            <button
+                              key={day.value}
+                              type="button"
+                              onClick={() => {
+                                const currentWeek = draftWeek ?? week;
+                                if (!currentWeek) return;
+                                const nextWeek = copySessionLocal(
+                                  currentWeek,
+                                  session.id,
+                                  day.value,
+                                );
+                                applyWeek(nextWeek);
+                                setCopyDaySessionId(null);
+                                const created = nextWeek.sessions.find(
+                                  (s) => s.weekday === day.value,
+                                );
+                                if (created) setSelectedSessionId(created.id);
+                              }}
+                              className="block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-ga-elevated"
+                            >
+                              {day.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
                     <button
                       type="button"
                       onClick={() => {

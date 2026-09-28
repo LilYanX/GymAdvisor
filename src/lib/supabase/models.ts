@@ -20,6 +20,9 @@ export type Athlete = Tables<"athletes">;
 export type AthleteInsert = TablesInsert<"athletes">;
 export type AthleteUpdate = TablesUpdate<"athletes">;
 
+export type AthleteBodyLog = Tables<"athlete_body_logs">;
+export type AthleteBodyLogInsert = TablesInsert<"athlete_body_logs">;
+
 /** Mouvement de la bibliothèque, avec vidéo et consignes réutilisables. */
 export type Exercise = Tables<"exercises">;
 export type ExerciseInsert = TablesInsert<"exercises">;

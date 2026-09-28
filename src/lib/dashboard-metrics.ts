@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   addDaysISO,
-  firstOfMonthISO,
   mondayOfWeekISO,
   todayISO,
 } from "@/lib/dates";
@@ -21,7 +20,7 @@ import type {
 } from "@/lib/supabase/models";
 import { MUSCLE_GROUP_LABELS } from "@/lib/labels";
 
-export type DashboardPeriod = "week" | "month";
+export type DashboardPeriod = "day" | "week" | "month";
 
 export type FeelingAverages = {
   energy: number | null;
@@ -51,8 +50,12 @@ export type ZoneLoad = {
 export type UaSeriesPoint = {
   key: string;
   label: string;
+  /** UA via RPE moyen des exercices : min × RPE_moy / 10 */
   ua: number;
+  /** UA via RPE final de séance : min × RPE_final / 10 */
+  uaFinal: number;
   avgRpe: number | null;
+  finalRpe: number | null;
 };
 
 /** Ratio de charge aiguë (7 j) / chronique (moy. hebdo sur 28 j). */
@@ -79,13 +82,17 @@ export type AthleteDashboardMetrics = {
   feelingSeries: FeelingSeriesPoint[];
   zones: ZoneLoad[];
   uaTotal: number;
+  /** Somme des UA calculées avec RPE final sur la période. */
+  uaFinalTotal: number;
   uaSeries: UaSeriesPoint[];
   acwr: AcuteChronicRatio;
 };
 
 export type AthleteDashboardBundle = {
+  day: AthleteDashboardMetrics;
   week: AthleteDashboardMetrics;
   month: AthleteDashboardMetrics;
+  referenceDate: string;
 };
 
 type SessionUa = {
@@ -93,7 +100,9 @@ type SessionUa = {
   title: string;
   date: string;
   ua: number;
-  avgRpe: number;
+  uaFinal: number;
+  avgRpe: number | null;
+  finalRpe: number | null;
 };
 
 function round1(value: number): number {
@@ -107,25 +116,28 @@ function avg(values: number[]): number | null {
 
 export function periodRange(
   period: DashboardPeriod,
-  today: string = todayISO(),
+  referenceDate: string = todayISO(),
 ): { from: string; to: string } {
+  if (period === "day") {
+    return { from: referenceDate, to: referenceDate };
+  }
   if (period === "week") {
-    const from = mondayOfWeekISO(today);
+    const from = mondayOfWeekISO(referenceDate);
     return { from, to: addDaysISO(from, 6) };
   }
-  const from = firstOfMonthISO();
+  const from = `${referenceDate.slice(0, 7)}-01`;
   const [year, month] = from.split("-").map(Number);
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   return { from, to: `${from.slice(0, 7)}-${String(lastDay).padStart(2, "0")}` };
 }
 
 function feelingBucketKey(isoDate: string, period: DashboardPeriod): string {
-  if (period === "week") return isoDate;
+  if (period === "day" || period === "week") return isoDate;
   return mondayOfWeekISO(isoDate);
 }
 
 function feelingBucketLabel(key: string, period: DashboardPeriod): string {
-  if (period === "week") {
+  if (period === "day" || period === "week") {
     return new Intl.DateTimeFormat("fr-FR", {
       weekday: "short",
       day: "2-digit",
@@ -145,6 +157,18 @@ function emptyFeelingSeries(
   to: string,
 ): FeelingSeriesPoint[] {
   const feeling: FeelingSeriesPoint[] = [];
+  if (period === "day") {
+    feeling.push({
+      key: from,
+      label: feelingBucketLabel(from, period),
+      energy: null,
+      sleep: null,
+      pain: null,
+      motivation: null,
+      count: 0,
+    });
+    return feeling;
+  }
   if (period === "week") {
     for (let i = 0; i < 7; i += 1) {
       const key = addDaysISO(from, i);
@@ -212,9 +236,10 @@ function computeAcwr(sessions: SessionUa[], today: string): AcuteChronicRatio {
 export async function computeAthleteDashboard(
   athleteId: string,
   period: DashboardPeriod,
+  referenceDate: string = todayISO(),
 ): Promise<AthleteDashboardMetrics> {
-  const today = todayISO();
-  const { from, to } = periodRange(period, today);
+  const today = referenceDate;
+  const { from, to } = periodRange(period, referenceDate);
   const supabase = await createClient();
 
   const [{ data: checkIns }, { data: setLogs }, { data: sessionLogs }, { data: weeks }] =
@@ -446,24 +471,35 @@ export async function computeAthleteDashboard(
     if (!date || date < acwrFrom || date > today) continue;
 
     const rpes = rpesBySession.get(sessionId) ?? [];
-    if (rpes.length === 0) continue;
-    const avgRpe = rpes.reduce((a, b) => a + b, 0) / rpes.length;
+    const avgRpe =
+      rpes.length > 0
+        ? rpes.reduce((a, b) => a + b, 0) / rpes.length
+        : null;
 
     const log = logBySession.get(sessionId);
+    const finalRpe =
+      log?.final_rpe != null && Number.isFinite(log.final_rpe)
+        ? Number(log.final_rpe)
+        : null;
+
     const actualMinutes = sessionDurationMinutes(
       log?.started_at,
       log?.completed_at,
     );
     const minutes = actualMinutes ?? meta?.estimatedMinutes ?? 0;
-    const ua = sessionLoadUnits(minutes, avgRpe);
-    if (ua <= 0) continue;
+    const ua = avgRpe != null ? sessionLoadUnits(minutes, avgRpe) : 0;
+    const uaFinal =
+      finalRpe != null ? sessionLoadUnits(minutes, finalRpe) : 0;
+    if (ua <= 0 && uaFinal <= 0) continue;
 
     allSessionUas.push({
       sessionId,
       title: meta?.title ?? "Séance",
       date,
       ua,
-      avgRpe: round1(avgRpe),
+      uaFinal,
+      avgRpe: avgRpe != null ? round1(avgRpe) : null,
+      finalRpe,
     });
   }
 
@@ -479,25 +515,38 @@ export async function computeAthleteDashboard(
   const uaTotal = round1(
     periodSessions.reduce((sum, session) => sum + session.ua, 0),
   );
+  const uaFinalTotal = round1(
+    periodSessions.reduce((sum, session) => sum + session.uaFinal, 0),
+  );
 
   let uaSeries: UaSeriesPoint[];
-  if (period === "week") {
+  if (period === "day" || period === "week") {
     uaSeries = periodSessions.map((session) => ({
       key: session.sessionId,
       label: `${shortWeekday(session.date)} ${truncateLabel(session.title, 10)}`,
       ua: round1(session.ua),
+      uaFinal: round1(session.uaFinal),
       avgRpe: session.avgRpe,
+      finalRpe: session.finalRpe,
     }));
   } else {
     const weekBuckets = new Map<
       string,
-      { ua: number; rpes: number[]; label: string }
+      {
+        ua: number;
+        uaFinal: number;
+        rpes: number[];
+        finalRpes: number[];
+        label: string;
+      }
     >();
     let cursor = mondayOfWeekISO(from);
     while (cursor <= to) {
       weekBuckets.set(cursor, {
         ua: 0,
+        uaFinal: 0,
         rpes: [],
+        finalRpes: [],
         label: feelingBucketLabel(cursor, "month"),
       });
       cursor = addDaysISO(cursor, 7);
@@ -507,13 +556,17 @@ export async function computeAthleteDashboard(
       const bucket = weekBuckets.get(key);
       if (!bucket) continue;
       bucket.ua += session.ua;
-      bucket.rpes.push(session.avgRpe);
+      bucket.uaFinal += session.uaFinal;
+      if (session.avgRpe != null) bucket.rpes.push(session.avgRpe);
+      if (session.finalRpe != null) bucket.finalRpes.push(session.finalRpe);
     }
     uaSeries = [...weekBuckets.entries()].map(([key, bucket]) => ({
       key,
       label: bucket.label,
       ua: round1(bucket.ua),
+      uaFinal: round1(bucket.uaFinal),
       avgRpe: avg(bucket.rpes),
+      finalRpe: avg(bucket.finalRpes),
     }));
   }
 
@@ -540,7 +593,9 @@ export async function computeAthleteDashboard(
     completedIds.has(session.id),
   ).length;
 
-  const periodRpes = periodSessions.map((session) => session.avgRpe);
+  const periodRpes = periodSessions
+    .map((session) => session.avgRpe)
+    .filter((value): value is number => value != null);
   const feelingScoreValues: number[] = [];
   for (let i = 0; i < allEnergy.length; i += 1) {
     feelingScoreValues.push(
@@ -573,6 +628,7 @@ export async function computeAthleteDashboard(
     feelingSeries,
     zones,
     uaTotal,
+    uaFinalTotal,
     uaSeries,
     acwr: computeAcwr(allSessionUas, today),
   };
@@ -580,10 +636,12 @@ export async function computeAthleteDashboard(
 
 export async function getAthleteDashboardBundle(
   athleteId: string,
+  referenceDate: string = todayISO(),
 ): Promise<AthleteDashboardBundle> {
-  const [week, month] = await Promise.all([
-    computeAthleteDashboard(athleteId, "week"),
-    computeAthleteDashboard(athleteId, "month"),
+  const [day, week, month] = await Promise.all([
+    computeAthleteDashboard(athleteId, "day", referenceDate),
+    computeAthleteDashboard(athleteId, "week", referenceDate),
+    computeAthleteDashboard(athleteId, "month", referenceDate),
   ]);
-  return { week, month };
+  return { day, week, month, referenceDate };
 }

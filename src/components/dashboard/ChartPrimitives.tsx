@@ -139,44 +139,37 @@ type UaRpePoint = {
   key: string;
   label: string;
   ua: number;
+  uaFinal: number;
   avgRpe: number | null;
+  finalRpe: number | null;
 };
 
-/** Barres UA + ligne RPE moyen (échelle 0–10). */
+/** Barres jumelles : UA (RPE moy.) + UA (RPE final). */
 export function UaRpeChart({ points }: { points: UaRpePoint[] }) {
-  const maxUa = Math.max(...points.map((p) => p.ua), 1);
+  const maxUa = Math.max(
+    ...points.flatMap((p) => [p.ua, p.uaFinal]),
+    1,
+  );
   const width = 320;
-  const height = 140;
+  const height = 148;
   const padL = 28;
-  const padR = 28;
+  const padR = 12;
   const padT = 12;
   const padB = 28;
   const chartW = width - padL - padR;
   const chartH = height - padT - padB;
   const n = Math.max(points.length, 1);
-  const gap = Math.min(10, chartW / (n * 4));
-  const barW = Math.max(8, (chartW - gap * (n - 1)) / n);
-
-  const rpePoints = points
-    .map((point, index) => {
-      if (point.avgRpe == null) return null;
-      const x = padL + index * (barW + gap) + barW / 2;
-      const y = padT + chartH - (point.avgRpe / 10) * chartH;
-      return { x, y, rpe: point.avgRpe };
-    })
-    .filter((p): p is { x: number; y: number; rpe: number } => p != null);
-
-  const linePath =
-    rpePoints.length > 1
-      ? rpePoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ")
-      : "";
+  const gap = Math.min(12, chartW / (n * 3));
+  const groupW = Math.max(14, (chartW - gap * (n - 1)) / n);
+  const innerGap = 2;
+  const barW = Math.max(5, (groupW - innerGap) / 2);
 
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
       className="h-40 w-full"
       role="img"
-      aria-label="Charges UA et RPE moyen"
+      aria-label="Charges UA RPE moyen et RPE final"
     >
       {[0.25, 0.5, 0.75, 1].map((tick) => {
         const y = padT + chartH * (1 - tick);
@@ -195,9 +188,12 @@ export function UaRpeChart({ points }: { points: UaRpePoint[] }) {
       })}
 
       {points.map((point, index) => {
-        const h = Math.max(point.ua > 0 ? 3 : 2, (point.ua / maxUa) * chartH);
-        const x = padL + index * (barW + gap);
-        const y = padT + chartH - h;
+        const x0 = padL + index * (groupW + gap);
+        const hAvg = Math.max(point.ua > 0 ? 3 : 2, (point.ua / maxUa) * chartH);
+        const hFinal = Math.max(
+          point.uaFinal > 0 ? 3 : 2,
+          (point.uaFinal / maxUa) * chartH,
+        );
         const label =
           point.label.length > 8
             ? `${point.label.slice(0, 7)}…`
@@ -205,19 +201,28 @@ export function UaRpeChart({ points }: { points: UaRpePoint[] }) {
         return (
           <g key={point.key}>
             <rect
-              x={x}
-              y={y}
+              x={x0}
+              y={padT + chartH - hAvg}
               width={barW}
-              height={h}
-              rx="3"
+              height={hAvg}
+              rx="2"
               fill="var(--ga-blue)"
-              opacity={point.ua > 0 ? 0.88 : 0.2}
+              opacity={point.ua > 0 ? 0.9 : 0.2}
+            />
+            <rect
+              x={x0 + barW + innerGap}
+              y={padT + chartH - hFinal}
+              width={barW}
+              height={hFinal}
+              rx="2"
+              fill="var(--ga-lime)"
+              opacity={point.uaFinal > 0 ? 0.85 : 0.2}
             />
             <text
-              x={x + barW / 2}
+              x={x0 + groupW / 2}
               y={height - 8}
               textAnchor="middle"
-              className="fill-[var(--ga-muted)]"
+              fill="var(--ga-muted)"
               fontSize="8"
             >
               {label}
@@ -226,46 +231,14 @@ export function UaRpeChart({ points }: { points: UaRpePoint[] }) {
         );
       })}
 
-      {linePath ? (
-        <path
-          d={linePath}
-          fill="none"
-          stroke="var(--ga-lime)"
-          strokeWidth="2"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-      ) : null}
-
-      {rpePoints.map((point, index) => (
-        <circle
-          key={`rpe-${index}`}
-          cx={point.x}
-          cy={point.y}
-          r="3.5"
-          fill="var(--ga-lime)"
-          stroke="var(--ga-card)"
-          strokeWidth="1.5"
-        />
-      ))}
-
       <text
         x={padL - 4}
         y={padT + 4}
         textAnchor="end"
-        className="fill-[var(--ga-muted)]"
+        fill="var(--ga-muted)"
         fontSize="8"
       >
         UA
-      </text>
-      <text
-        x={width - padR + 4}
-        y={padT + 4}
-        textAnchor="start"
-        className="fill-[var(--ga-muted)]"
-        fontSize="8"
-      >
-        RPE
       </text>
     </svg>
   );

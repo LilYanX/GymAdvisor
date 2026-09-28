@@ -266,15 +266,24 @@ export async function getAthleteFollowUp(
     );
     const minutes = actualMinutes ?? session.estimated_minutes ?? 0;
     const loadUnits = sessionLoadUnits(minutes, avgRpe);
+    const finalRpe = sessionLog?.final_rpe ?? null;
+    const loadUnitsFinal =
+      finalRpe != null ? sessionLoadUnits(minutes, finalRpe) : 0;
     const completed = sessionLog?.status === "completed";
 
-    if (completed || sessionTonnage > 0 || loadUnits > 0) {
+    if (
+      completed ||
+      sessionTonnage > 0 ||
+      loadUnits > 0 ||
+      loadUnitsFinal > 0
+    ) {
       tonnageSessions.push({
         sessionId: session.id,
         title: session.title,
         date: session.scheduled_date,
         tonnageKg: Math.round(sessionTonnage),
         loadUnits,
+        loadUnitsFinal,
         exercises: exercisesTonnage.filter((item) => item.tonnageKg > 0),
       });
     }
@@ -284,10 +293,12 @@ export async function getAthleteFollowUp(
     (acc, session) => ({
       tonnageKg: acc.tonnageKg + session.tonnageKg,
       loadUnits: acc.loadUnits + session.loadUnits,
+      loadUnitsFinal: acc.loadUnitsFinal + session.loadUnitsFinal,
     }),
-    { tonnageKg: 0, loadUnits: 0 },
+    { tonnageKg: 0, loadUnits: 0, loadUnitsFinal: 0 },
   );
   totals.loadUnits = Math.round(totals.loadUnits * 10) / 10;
+  totals.loadUnitsFinal = Math.round(totals.loadUnitsFinal * 10) / 10;
 
   const payments = (athletePayments ?? []) as Payment[];
   const paymentState = getAthletePaymentState(payments, today, paymentSettings);

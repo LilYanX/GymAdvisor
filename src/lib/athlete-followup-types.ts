@@ -28,6 +28,7 @@ export type TonnageSession = {
   date: string | null;
   tonnageKg: number;
   loadUnits: number;
+  loadUnitsFinal: number;
   exercises: TonnageExercise[];
 };
 
@@ -51,5 +52,6 @@ export type AthleteFollowUp = {
   totals: {
     tonnageKg: number;
     loadUnits: number;
+    loadUnitsFinal: number;
   };
 };

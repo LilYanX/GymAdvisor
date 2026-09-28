@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import type {
   AthleteDashboardBundle,
   AthleteDashboardMetrics,
@@ -18,6 +19,12 @@ const FEELING_KEYS = [
   { key: "sleep" as const, label: "Sommeil" },
   { key: "pain" as const, label: "Douleurs" },
   { key: "motivation" as const, label: "Motivation" },
+];
+
+const PERIOD_TABS: { id: DashboardPeriod; label: string; title: string }[] = [
+  { id: "day", label: "Quotidien", title: "quotidien" },
+  { id: "week", label: "Hebdo", title: "hebdo" },
+  { id: "month", label: "Mensuel", title: "mensuel" },
 ];
 
 function formatScore(value: number | null): string {
@@ -139,31 +146,43 @@ function ZonesPanel({ metrics }: { metrics: AthleteDashboardMetrics }) {
 }
 
 function UaPanel({ metrics }: { metrics: AthleteDashboardMetrics }) {
-  if (metrics.uaTotal === 0 && metrics.uaSeries.every((p) => p.ua === 0)) {
+  if (
+    metrics.uaTotal === 0 &&
+    metrics.uaFinalTotal === 0 &&
+    metrics.uaSeries.every((p) => p.ua === 0 && p.uaFinal === 0)
+  ) {
     return (
       <p className="text-sm text-ga-muted">
-        Aucune UA calculable (durée × RPE moyen / 10).
+        Aucune UA calculable (durée × RPE / 10).
       </p>
     );
   }
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="text-sm">
-          <span className="text-2xl font-semibold text-ga-fg">
-            {metrics.uaTotal.toLocaleString("fr-FR")}
-          </span>
-          <span className="ml-1 text-ga-muted">UA</span>
-        </p>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+          <p>
+            <span className="text-2xl font-semibold text-ga-fg">
+              {metrics.uaTotal.toLocaleString("fr-FR")}
+            </span>
+            <span className="ml-1 text-ga-muted">UA moy.</span>
+          </p>
+          <p>
+            <span className="text-2xl font-semibold text-ga-fg">
+              {metrics.uaFinalTotal.toLocaleString("fr-FR")}
+            </span>
+            <span className="ml-1 text-ga-muted">UA final</span>
+          </p>
+        </div>
         <div className="flex items-center gap-3 text-[10px] text-ga-muted">
           <span className="inline-flex items-center gap-1">
             <span className="inline-block h-2 w-2 rounded-sm bg-ga-blue" />
-            UA
+            RPE moy.
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="inline-block h-0.5 w-3 bg-ga-lime" />
-            RPE moy.
+            <span className="inline-block h-2 w-2 rounded-sm bg-ga-lime" />
+            RPE final
           </span>
         </div>
       </div>
@@ -194,13 +213,29 @@ export function AthleteMetricsDashboard({
   exportHrefBase?: string;
   variant?: "coach" | "athlete";
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [period, setPeriod] = useState<DashboardPeriod>("week");
-  const metrics = period === "week" ? bundle.week : bundle.month;
+  const metrics =
+    period === "day"
+      ? bundle.day
+      : period === "week"
+        ? bundle.week
+        : bundle.month;
   const rangeLabel = useMemo(
-    () => `${formatDayMonth(metrics.from)} – ${formatDayMonth(metrics.to)}`,
+    () =>
+      metrics.from === metrics.to
+        ? formatDayMonth(metrics.from)
+        : `${formatDayMonth(metrics.from)} – ${formatDayMonth(metrics.to)}`,
     [metrics.from, metrics.to],
   );
   const compact = variant === "athlete";
+  const periodTitle =
+    PERIOD_TABS.find((tab) => tab.id === period)?.title ?? "hebdo";
+
+  function setReferenceDate(next: string) {
+    router.push(`${pathname}?date=${encodeURIComponent(next)}`);
+  }
 
   return (
     <section
@@ -208,26 +243,59 @@ export function AthleteMetricsDashboard({
         compact ? "rounded-2xl p-4" : "rounded-xl p-4 md:p-5"
       }`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <h2 className={`font-semibold ${compact ? "text-sm" : "text-base"}`}>
-            Suivi {period === "week" ? "hebdo" : "mensuel"}
-          </h2>
-          <p className="text-xs text-ga-muted">{rangeLabel}</p>
+      <div
+        className={`flex gap-2 ${
+          compact
+            ? "flex-col"
+            : "flex-wrap items-center justify-between"
+        }`}
+      >
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className={`font-semibold ${compact ? "text-sm" : "text-base"}`}>
+              Suivi {periodTitle}
+            </h2>
+            <p className="text-xs text-ga-muted">{rangeLabel}</p>
+          </div>
+          {compact ? (
+            <input
+              type="date"
+              value={bundle.referenceDate}
+              onChange={(event) => {
+                if (event.target.value) setReferenceDate(event.target.value);
+              }}
+              className="rounded-lg border border-ga-border bg-ga-elevated px-2 py-1 text-xs text-ga-fg outline-none focus:border-ga-lime"
+              aria-label="Date de référence"
+            />
+          ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-ga-border bg-ga-elevated p-0.5">
-            {(
-              [
-                { id: "week", label: "Hebdo" },
-                { id: "month", label: "Mensuel" },
-              ] as const
-            ).map((item) => (
+        <div
+          className={`flex items-center gap-2 ${compact ? "w-full" : "flex-wrap"}`}
+        >
+          {!compact ? (
+            <input
+              type="date"
+              value={bundle.referenceDate}
+              onChange={(event) => {
+                if (event.target.value) setReferenceDate(event.target.value);
+              }}
+              className="rounded-lg border border-ga-border bg-ga-elevated px-2 py-1 text-xs text-ga-fg outline-none focus:border-ga-lime"
+              aria-label="Date de référence"
+            />
+          ) : null}
+          <div
+            className={`flex rounded-lg border border-ga-border bg-ga-elevated p-0.5 ${
+              compact ? "w-full" : ""
+            }`}
+          >
+            {PERIOD_TABS.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setPeriod(item.id)}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                  compact ? "flex-1 text-center" : ""
+                } ${
                   period === item.id
                     ? "bg-ga-lime text-black"
                     : "text-ga-muted hover:text-ga-fg"
@@ -239,10 +307,10 @@ export function AthleteMetricsDashboard({
           </div>
           {showExport && exportHrefBase ? (
             <a
-              href={`${exportHrefBase}?period=${period}`}
+              href={`${exportHrefBase}?period=${period}&date=${bundle.referenceDate}`}
               title="Exporter Excel"
               aria-label="Exporter Excel"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-ga-border text-ga-muted transition hover:border-ga-lime/40 hover:text-ga-fg"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-ga-border text-ga-muted transition hover:border-ga-lime/40 hover:text-ga-fg"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -336,7 +404,8 @@ export function AthleteMetricsDashboard({
             Charges en UA
           </h3>
           <p className="mt-1 text-[11px] text-ga-muted">
-            {period === "week" ? "Par séance" : "Par semaine"} · min × RPE / 10
+            {period === "month" ? "Par semaine" : "Par séance"} · min × RPE / 10
+            (moy. exercices vs final)
           </p>
           <div className="mt-3 flex min-h-0 flex-1 flex-col">
             <UaPanel metrics={metrics} />

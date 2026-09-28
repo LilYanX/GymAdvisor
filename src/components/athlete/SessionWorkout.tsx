@@ -18,6 +18,10 @@ import {
 } from "@/lib/workout-groups";
 import { formatPrescriptionQuantity } from "@/lib/labels";
 import { toDatetimeLocalValue } from "@/lib/session-timing";
+import {
+  evaluateOneRmFormula,
+  pickSetForOneRm,
+} from "@/lib/one-rm-formula";
 
 type SetDraft = {
   set_number: number;
@@ -32,20 +36,22 @@ type ExerciseDraft = {
   comment: string;
 };
 
-function prescription(item: AthleteExercise): string {
-  const parts = [
-    formatPrescriptionQuantity(
-      item.sets_count,
-      item.target_reps,
-      item.target_unit ?? "reps",
-      item.target_secondary_reps ?? null,
-    ),
-  ];
+function prescriptionMain(item: AthleteExercise): string {
+  return formatPrescriptionQuantity(
+    item.sets_count,
+    item.target_reps,
+    item.target_unit ?? "reps",
+    item.target_secondary_reps ?? null,
+  );
+}
+
+function prescriptionDetails(item: AthleteExercise): string {
+  const parts: string[] = [];
   if (item.tempo) parts.push(`tempo ${item.tempo}`);
   if (item.target_weight_kg != null) parts.push(`vise ${item.target_weight_kg} kg`);
   if (item.target_rpe != null) parts.push(`RPE ${item.target_rpe}`);
   if (item.coach_note) parts.push(item.coach_note);
-  return parts.join(", ");
+  return parts.join(" · ");
 }
 
 function buildDraft(item: AthleteExercise): ExerciseDraft {
@@ -81,6 +87,12 @@ function ExercisePanel({
   disabled: boolean;
 }) {
   const videoUrl = item.exercise?.video_url;
+  const details = prescriptionDetails(item);
+  const oneRmPick = pickSetForOneRm(draft.sets);
+  const estimatedOneRm =
+    oneRmPick && item.exercise?.one_rm_formula
+      ? evaluateOneRmFormula(item.exercise.one_rm_formula, oneRmPick)
+      : null;
 
   function updateSet(
     setNumber: number,
@@ -113,7 +125,20 @@ function ExercisePanel({
       <h2 className={`font-semibold ${compact ? "mt-3 text-lg" : "mt-5 text-2xl"}`}>
         {item.exercise?.name ?? "Exercice"}
       </h2>
-      <p className="mt-1 text-sm text-ga-muted">{prescription(item)}</p>
+      <p
+        className={`font-semibold ${compact ? "mt-1 text-lg" : "mt-1 text-2xl"}`}
+      >
+        {prescriptionMain(item)}
+      </p>
+      {details ? (
+        <p className="mt-1 text-sm text-ga-muted">{details}</p>
+      ) : null}
+      {estimatedOneRm != null ? (
+        <p className="mt-1 text-sm text-ga-muted">
+          1RM estimée :{" "}
+          <span className="font-medium text-ga-fg">{estimatedOneRm} kg</span>
+        </p>
+      ) : null}
       {item.exercise?.cues && item.exercise.cues.length > 0 ? (
         <ol className="mt-3 list-decimal space-y-1.5 pl-4 text-sm text-ga-muted">
           {item.exercise.cues.slice(0, 6).map((cue) => (
@@ -123,7 +148,7 @@ function ExercisePanel({
       ) : null}
 
       <div className="mt-4 w-full max-w-full">
-        <div className="grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)_2.25rem] items-center gap-x-2 gap-y-1 text-xs text-ga-muted">
+        <div className="grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem] items-center gap-x-2 gap-y-1 text-xs text-ga-muted">
           <span>Sér.</span>
           <span>Charge</span>
           <span>Reps</span>
@@ -133,7 +158,7 @@ function ExercisePanel({
           {draft.sets.map((set) => (
             <div
               key={set.set_number}
-              className="grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)_2.25rem] items-center gap-x-2"
+              className="grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem] items-center gap-x-2"
             >
               <span className="text-sm text-ga-muted">{set.set_number}</span>
               <input
@@ -147,7 +172,7 @@ function ExercisePanel({
                     event.target.value === "" ? null : Number(event.target.value);
                   updateSet(set.set_number, { weight_kg: weightKg });
                 }}
-                className="min-w-0 w-full max-w-full rounded-lg border border-ga-border bg-ga-elevated px-2 py-2 text-sm outline-none focus:border-ga-lime"
+                className="min-w-0 w-full max-w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-3 text-base outline-none focus:border-ga-lime"
               />
               <input
                 type="number"
@@ -159,7 +184,7 @@ function ExercisePanel({
                     event.target.value === "" ? null : Number(event.target.value);
                   updateSet(set.set_number, { reps });
                 }}
-                className="min-w-0 w-full max-w-full rounded-lg border border-ga-border bg-ga-elevated px-2 py-2 text-sm outline-none focus:border-ga-lime"
+                className="min-w-0 w-full max-w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-3 text-base outline-none focus:border-ga-lime"
               />
               <button
                 type="button"
@@ -167,7 +192,7 @@ function ExercisePanel({
                 onClick={() =>
                   updateSet(set.set_number, { completed: !set.completed })
                 }
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-base font-semibold ${
                   set.completed
                     ? "bg-ga-lime text-black"
                     : "bg-ga-elevated text-ga-muted"
@@ -276,6 +301,7 @@ export function SessionWorkout({
   const [error, setError] = useState<string | null>(null);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [endedAt, setEndedAt] = useState(toDatetimeLocalValue);
+  const [finalRpe, setFinalRpe] = useState<number | null>(null);
 
   const group = groups[index];
   const total = groups.length;
@@ -338,9 +364,13 @@ export function SessionWorkout({
 
   async function finishSession() {
     setError(null);
+    if (finalRpe == null) {
+      setError("Indique ton RPE final (1–10).");
+      return;
+    }
     setAdvancing(true);
     try {
-      const done = await completeSession(session.id, endedAt);
+      const done = await completeSession(session.id, endedAt, finalRpe);
       if (done.error) {
         setError(done.error);
         return;
@@ -357,9 +387,9 @@ export function SessionWorkout({
       <>
         <div className="px-5 pb-32 pt-8">
           <p className="text-sm text-ga-muted">{session.title}</p>
-          <h1 className="mt-1 text-2xl font-semibold">Heure de fin</h1>
+          <h1 className="mt-1 text-2xl font-semibold">Fin de séance</h1>
           <label className="mt-8 block text-sm">
-            <span className="font-medium">Fin de séance</span>
+            <span className="font-medium">Heure de fin</span>
             <input
               type="datetime-local"
               value={endedAt}
@@ -367,6 +397,28 @@ export function SessionWorkout({
               className="mt-2 w-full rounded-xl border border-ga-border bg-ga-elevated px-3 py-2.5 text-sm outline-none focus:border-ga-lime"
             />
           </label>
+          <div className="mt-6">
+            <p className="text-sm font-medium">RPE final</p>
+            <p className="mt-1 text-xs text-ga-muted">
+              Difficulté globale de la séance (1 = très facile, 10 = max)
+            </p>
+            <div className="mt-3 grid grid-cols-5 gap-2">
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFinalRpe(value)}
+                  className={`rounded-xl py-2.5 text-sm font-semibold transition ${
+                    finalRpe === value
+                      ? "bg-ga-lime text-black"
+                      : "bg-ga-elevated text-ga-muted hover:text-ga-fg"
+                  }`}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+          </div>
           {error ? <p className="mt-4 text-sm text-ga-red">{error}</p> : null}
         </div>
         <FixedBottomBar offsetClass="bottom-14" variant="athlete">
