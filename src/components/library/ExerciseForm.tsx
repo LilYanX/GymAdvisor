@@ -135,7 +135,7 @@ export function ExerciseForm() {
           className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 font-mono text-sm outline-none focus:border-ga-lime"
         />
         <span className="mt-1.5 block text-xs text-ga-muted">
-          Variables : poids (ou weight), reps. Opérateurs : + − × ÷ ( ).
+          Variables : poids (ou weight), reps. Opérateurs : + − * / ( ).
         </span>
       </label>
       {uploadError || state.error ? (
