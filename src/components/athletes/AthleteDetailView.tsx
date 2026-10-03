@@ -75,10 +75,10 @@ export function AthleteDetailView({
         </div>
       </section>
 
-      <div className="grid items-start gap-4 xl:grid-cols-12">
+      <div className="grid items-stretch gap-4 xl:grid-cols-12">
         <form
           action={action}
-          className="grid grid-cols-2 gap-2.5 rounded-xl border border-ga-border bg-ga-card p-4 xl:col-span-5"
+          className="grid h-full grid-cols-2 content-start gap-2.5 rounded-xl border border-ga-border bg-ga-card p-4 xl:col-span-5"
         >
           <h2 className="col-span-2 text-sm font-semibold">Informations</h2>
           <input type="hidden" name="athlete_id" value={athlete.id} />
@@ -311,25 +311,31 @@ export function AthleteDetailView({
           </section>
         </div>
 
-        <section className="rounded-xl border border-ga-border bg-ga-card p-4 xl:col-span-4">
+        <section className="relative min-h-0 overflow-hidden rounded-xl border border-ga-border bg-ga-card p-4 xl:col-span-4">
           <h2 className="text-sm font-semibold">Retours récents</h2>
           {data.feedbacks.length === 0 ? (
             <p className="mt-2 text-sm text-ga-muted">Aucun feedback.</p>
           ) : (
-            <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">
-              {data.feedbacks.slice(0, 8).map((item, index) => (
+            <ul className="absolute inset-x-4 bottom-4 top-11 space-y-1.5 overflow-y-auto">
+              {data.feedbacks.map((item, index) => (
                 <li
                   key={`${item.sessionId}-${item.exerciseName}-${index}`}
-                  className="rounded-lg border border-ga-border/70 bg-ga-elevated/50 px-3 py-2"
+                  className="rounded-lg border border-ga-border/70 bg-ga-elevated/50 px-3 py-1.5"
                 >
-                  <p className="text-[11px] text-ga-muted">
-                    {formatFeedbackDate(item.sessionDate)} · {item.sessionTitle}
-                  </p>
-                  <p className="text-sm font-medium">{item.exerciseName}</p>
-                  <p className="text-xs text-ga-muted">
-                    {item.rpe != null ? `RPE ${item.rpe}` : null}
-                    {item.rpe != null && item.comment ? " · " : null}
-                    {item.comment}
+                  <p className="truncate text-sm leading-snug">
+                    <span className="text-ga-muted">
+                      {formatFeedbackDate(item.sessionDate)}
+                    </span>
+                    <span className="text-ga-muted"> · </span>
+                    <span className="font-medium text-ga-fg">
+                      {item.exerciseName}
+                    </span>
+                    {item.rpe != null ? (
+                      <span className="text-ga-muted"> · RPE {item.rpe}</span>
+                    ) : null}
+                    {item.comment ? (
+                      <span className="text-ga-muted"> · {item.comment}</span>
+                    ) : null}
                   </p>
                 </li>
               ))}
@@ -422,31 +428,33 @@ export function AthleteDetailView({
         {data.sessionFeelings.length === 0 ? (
           <p className="mt-2 text-sm text-ga-muted">Aucun ressenti.</p>
         ) : (
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-            {data.sessionFeelings.slice(0, 10).map((feeling) => (
-              <article
-                key={feeling.id}
-                className={`rounded-lg border px-3 py-2 text-xs ${
-                  feeling.needs_attention
-                    ? "border-ga-red/50 bg-ga-red/10"
-                    : "border-ga-border bg-ga-elevated/40"
-                }`}
-              >
-                <p className="truncate text-ga-muted">
-                  {feeling.sessionTitle}
-                  {feeling.sessionDate
-                    ? ` · ${formatFeedbackDate(feeling.sessionDate)}`
-                    : ""}
-                </p>
-                {feeling.needs_attention ? (
-                  <p className="mt-0.5 font-semibold text-ga-red">Attention</p>
-                ) : null}
-                <p className="mt-1 text-ga-fg">
-                  E{feeling.fatigue} · S{feeling.sleep} · C{feeling.soreness} · St
-                  {feeling.stress} · H{feeling.mood}
-                </p>
-              </article>
-            ))}
+          <div className="mt-3 max-h-[5.75rem] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {data.sessionFeelings.map((feeling) => (
+                <article
+                  key={feeling.id}
+                  className={`rounded-lg border px-3 py-2 text-xs ${
+                    feeling.needs_attention
+                      ? "border-ga-red/50 bg-ga-red/10"
+                      : "border-ga-border bg-ga-elevated/40"
+                  }`}
+                >
+                  <p className="truncate text-ga-muted">
+                    {feeling.sessionDate
+                      ? formatFeedbackDate(feeling.sessionDate)
+                      : feeling.sessionTitle}
+                    {feeling.sessionDate && feeling.sessionTitle
+                      ? ` · ${feeling.sessionTitle}`
+                      : ""}
+                    {feeling.needs_attention ? " · Attention" : ""}
+                  </p>
+                  <p className="mt-1 truncate text-ga-fg">
+                    E{feeling.fatigue} · S{feeling.sleep} · C{feeling.soreness} ·
+                    St{feeling.stress} · H{feeling.mood}
+                  </p>
+                </article>
+              ))}
+            </div>
           </div>
         )}
       </section>
