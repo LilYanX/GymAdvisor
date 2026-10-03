@@ -30,13 +30,13 @@ export function sessionDurationMinutes(
   return Math.max(1, Math.round((end - start) / 60_000));
 }
 
-/** UA séance = durée (min) × (RPE / 10). */
+/** UA Foster (session-RPE) = durée (min) × RPE de séance (1–10). */
 export function sessionLoadUnits(
   durationMinutes: number,
   rpe: number,
 ): number {
   if (durationMinutes <= 0 || rpe <= 0) return 0;
-  return Math.round(durationMinutes * (rpe / 10) * 10) / 10;
+  return Math.round(durationMinutes * rpe * 10) / 10;
 }
 
 export function assertEndAfterStart(

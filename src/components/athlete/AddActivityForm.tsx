@@ -117,13 +117,14 @@ export function AddActivityForm({
           />
         </label>
         <label className="text-xs text-ga-muted">
-          RPE (1–10)
+          RPE séance (1–10)
           <input
             type="number"
             min={1}
             max={10}
             value={rpe}
             onChange={(event) => setRpe(event.target.value)}
+            required
             className="mt-1 w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 text-sm text-ga-fg outline-none focus:border-ga-lime"
           />
         </label>

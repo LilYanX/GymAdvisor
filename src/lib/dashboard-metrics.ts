@@ -5,10 +5,17 @@ import {
   todayISO,
 } from "@/lib/dates";
 import {
+  mean as mcleanMean,
+  mcleanTotal,
+  stdDev,
+  type McLeanScores,
+} from "@/lib/mclean";
+import {
   sessionDurationMinutes,
   sessionLoadUnits,
 } from "@/lib/session-timing";
 import type {
+  AthleteActivity,
   Exercise,
   MuscleGroup,
   Session,
@@ -23,20 +30,32 @@ import { MUSCLE_GROUP_LABELS } from "@/lib/labels";
 export type DashboardPeriod = "day" | "week" | "month";
 
 export type FeelingAverages = {
-  energy: number | null;
+  fatigue: number | null;
   sleep: number | null;
-  pain: number | null;
-  motivation: number | null;
+  soreness: number | null;
+  stress: number | null;
+  mood: number | null;
+  /** Score McLean moyen sur la période (5–25). */
+  totalScore: number | null;
+  /** Moyenne personnelle (historique ~28 check-ins). */
+  baselineMean: number | null;
+  /** Écart-type personnel. */
+  baselineSd: number | null;
+  /** Seuil d’alerte = moyenne − 1 écart-type. */
+  alertThreshold: number | null;
+  alert: boolean;
   count: number;
 };
 
 export type FeelingSeriesPoint = {
   key: string;
   label: string;
-  energy: number | null;
+  totalScore: number | null;
+  fatigue: number | null;
   sleep: number | null;
-  pain: number | null;
-  motivation: number | null;
+  soreness: number | null;
+  stress: number | null;
+  mood: number | null;
   count: number;
 };
 
@@ -45,14 +64,15 @@ export type ZoneLoad = {
   label: string;
   tonnageKg: number;
   percent: number;
+  setsCount: number;
 };
 
 export type UaSeriesPoint = {
   key: string;
   label: string;
-  /** UA via RPE moyen des exercices : min × RPE_moy / 10 */
+  /** UA complémentaire : durée × RPE moyen exercices. */
   ua: number;
-  /** UA via RPE final de séance : min × RPE_final / 10 */
+  /** UA principale Foster : durée × RPE de séance (final ou activité). */
   uaFinal: number;
   avgRpe: number | null;
   finalRpe: number | null;
@@ -63,6 +83,8 @@ export type AcuteChronicRatio = {
   acute: number;
   chronic: number;
   ratio: number | null;
+  /** false si < 4 semaines avec charge dans la fenêtre 28 j. */
+  sufficientData: boolean;
 };
 
 export type DashboardKpis = {
@@ -82,7 +104,7 @@ export type AthleteDashboardMetrics = {
   feelingSeries: FeelingSeriesPoint[];
   zones: ZoneLoad[];
   uaTotal: number;
-  /** Somme des UA calculées avec RPE final sur la période. */
+  /** Somme des UA Foster (RPE séance) sur la période. */
   uaFinalTotal: number;
   uaSeries: UaSeriesPoint[];
   acwr: AcuteChronicRatio;
@@ -101,6 +123,8 @@ type SessionUa = {
   date: string;
   ua: number;
   uaFinal: number;
+  /** Charge pour ACWR (Foster prioritaire). */
+  load: number;
   avgRpe: number | null;
   finalRpe: number | null;
 };
@@ -131,9 +155,8 @@ export function periodRange(
   return { from, to: `${from.slice(0, 7)}-${String(lastDay).padStart(2, "0")}` };
 }
 
-function feelingBucketKey(isoDate: string, period: DashboardPeriod): string {
-  if (period === "day" || period === "week") return isoDate;
-  return mondayOfWeekISO(isoDate);
+function feelingBucketKey(isoDate: string, _period: DashboardPeriod): string {
+  return isoDate;
 }
 
 function feelingBucketLabel(key: string, period: DashboardPeriod): string {
@@ -157,15 +180,20 @@ function emptyFeelingSeries(
   to: string,
 ): FeelingSeriesPoint[] {
   const feeling: FeelingSeriesPoint[] = [];
+  const blank = {
+    totalScore: null as number | null,
+    fatigue: null as number | null,
+    sleep: null as number | null,
+    soreness: null as number | null,
+    stress: null as number | null,
+    mood: null as number | null,
+    count: 0,
+  };
   if (period === "day") {
     feeling.push({
       key: from,
       label: feelingBucketLabel(from, period),
-      energy: null,
-      sleep: null,
-      pain: null,
-      motivation: null,
-      count: 0,
+      ...blank,
     });
     return feeling;
   }
@@ -175,26 +203,19 @@ function emptyFeelingSeries(
       feeling.push({
         key,
         label: feelingBucketLabel(key, period),
-        energy: null,
-        sleep: null,
-        pain: null,
-        motivation: null,
-        count: 0,
+        ...blank,
       });
     }
   } else {
-    let cursor = mondayOfWeekISO(from);
+    // Mensuel : une courbe quotidienne pour le score McLean
+    let cursor = from;
     while (cursor <= to) {
       feeling.push({
         key: cursor,
-        label: feelingBucketLabel(cursor, period),
-        energy: null,
-        sleep: null,
-        pain: null,
-        motivation: null,
-        count: 0,
+        label: feelingBucketLabel(cursor, "day"),
+        ...blank,
       });
-      cursor = addDaysISO(cursor, 7);
+      cursor = addDaysISO(cursor, 1);
     }
   }
   return feeling;
@@ -218,18 +239,26 @@ function computeAcwr(sessions: SessionUa[], today: string): AcuteChronicRatio {
 
   let acute = 0;
   let chronicSum = 0;
+  const weeksWithLoad = new Set<string>();
+
   for (const session of sessions) {
     if (session.date < chronicFrom || session.date > today) continue;
-    chronicSum += session.ua;
-    if (session.date >= acuteFrom) acute += session.ua;
+    const load = session.load;
+    if (load <= 0) continue;
+    chronicSum += load;
+    weeksWithLoad.add(mondayOfWeekISO(session.date));
+    if (session.date >= acuteFrom) acute += load;
   }
 
+  const sufficientData = weeksWithLoad.size >= 4;
   const chronic = round1(chronicSum / 4);
   acute = round1(acute);
   return {
     acute,
     chronic,
-    ratio: chronic > 0 ? round1(acute / chronic) : null,
+    sufficientData,
+    ratio:
+      sufficientData && chronic > 0 ? round1(acute / chronic) : null,
   };
 }
 
@@ -241,8 +270,11 @@ export async function computeAthleteDashboard(
   const today = referenceDate;
   const { from, to } = periodRange(period, referenceDate);
   const supabase = await createClient();
+  const acwrWindowStart = addDaysISO(today, -27);
+  const activitiesFrom = from < acwrWindowStart ? from : acwrWindowStart;
+  const activitiesTo = to > today ? to : today;
 
-  const [{ data: checkIns }, { data: setLogs }, { data: sessionLogs }, { data: weeks }] =
+  const [{ data: checkIns }, { data: setLogs }, { data: sessionLogs }, { data: weeks }, { data: activitiesData }] =
     await Promise.all([
       supabase
         .from("session_check_ins")
@@ -261,6 +293,12 @@ export async function computeAthleteDashboard(
         .from("program_weeks")
         .select("id")
         .eq("athlete_id", athleteId),
+      supabase
+        .from("athlete_activities")
+        .select("*")
+        .eq("athlete_id", athleteId)
+        .gte("performed_on", activitiesFrom)
+        .lte("performed_on", activitiesTo),
     ]);
 
   const weekIds = (weeks ?? []).map((week) => week.id);
@@ -384,34 +422,75 @@ export async function computeAthleteDashboard(
 
   const feelingBuckets = new Map<
     string,
-    { energy: number[]; sleep: number[]; pain: number[]; motivation: number[] }
+    {
+      fatigue: number[];
+      sleep: number[];
+      soreness: number[];
+      stress: number[];
+      mood: number[];
+      totals: number[];
+    }
   >();
-  const allEnergy: number[] = [];
+  const periodTotals: number[] = [];
+  const allFatigue: number[] = [];
   const allSleep: number[] = [];
-  const allPain: number[] = [];
-  const allMotivation: number[] = [];
+  const allSoreness: number[] = [];
+  const allStress: number[] = [];
+  const allMood: number[] = [];
+
+  const historyTotals: number[] = [];
+  for (const row of checkInRows) {
+    const scores: McLeanScores = {
+      fatigue: row.fatigue,
+      sleep: row.sleep,
+      soreness: row.soreness,
+      stress: row.stress,
+      mood: row.mood,
+    };
+    historyTotals.push(mcleanTotal(scores));
+  }
+  const baselineMean = mcleanMean(historyTotals);
+  const baselineSd = stdDev(historyTotals);
+  const alertThreshold =
+    baselineMean != null && baselineSd != null
+      ? round1(baselineMean - baselineSd)
+      : null;
 
   for (const row of checkInRows) {
     const date =
       (row.session_id ? sessionMetaById.get(row.session_id)?.date : null) ??
       row.created_at.slice(0, 10);
     if (date < from || date > to) continue;
+    const scores: McLeanScores = {
+      fatigue: row.fatigue,
+      sleep: row.sleep,
+      soreness: row.soreness,
+      stress: row.stress,
+      mood: row.mood,
+    };
+    const total = mcleanTotal(scores);
     const key = feelingBucketKey(date, period);
     const bucket = feelingBuckets.get(key) ?? {
-      energy: [],
+      fatigue: [],
       sleep: [],
-      pain: [],
-      motivation: [],
+      soreness: [],
+      stress: [],
+      mood: [],
+      totals: [],
     };
-    bucket.energy.push(row.energy);
-    bucket.sleep.push(row.sleep);
-    bucket.pain.push(row.pain);
-    bucket.motivation.push(row.motivation);
+    bucket.fatigue.push(scores.fatigue);
+    bucket.sleep.push(scores.sleep);
+    bucket.soreness.push(scores.soreness);
+    bucket.stress.push(scores.stress);
+    bucket.mood.push(scores.mood);
+    bucket.totals.push(total);
     feelingBuckets.set(key, bucket);
-    allEnergy.push(row.energy);
-    allSleep.push(row.sleep);
-    allPain.push(row.pain);
-    allMotivation.push(row.motivation);
+    allFatigue.push(scores.fatigue);
+    allSleep.push(scores.sleep);
+    allSoreness.push(scores.soreness);
+    allStress.push(scores.stress);
+    allMood.push(scores.mood);
+    periodTotals.push(total);
   }
 
   const feelingSeries = emptyFeelingSeries(period, from, to).map((point) => {
@@ -419,15 +498,24 @@ export async function computeAthleteDashboard(
     if (!bucket) return point;
     return {
       ...point,
-      energy: avg(bucket.energy),
+      totalScore: avg(bucket.totals),
+      fatigue: avg(bucket.fatigue),
       sleep: avg(bucket.sleep),
-      pain: avg(bucket.pain),
-      motivation: avg(bucket.motivation),
-      count: bucket.energy.length,
+      soreness: avg(bucket.soreness),
+      stress: avg(bucket.stress),
+      mood: avg(bucket.mood),
+      count: bucket.totals.length,
     };
   });
 
+  const periodFeelingScore = avg(periodTotals);
+  const feelingAlert =
+    periodFeelingScore != null &&
+    alertThreshold != null &&
+    periodFeelingScore < alertThreshold;
+
   const zoneTonnage = new Map<MuscleGroup, number>();
+  const zoneSets = new Map<MuscleGroup, number>();
   const rpesBySession = new Map<string, number[]>();
 
   for (const set of setRows) {
@@ -444,6 +532,10 @@ export async function computeAthleteDashboard(
         exercise.muscle_group,
         (zoneTonnage.get(exercise.muscle_group) ?? 0) + tonnage,
       );
+      zoneSets.set(
+        exercise.muscle_group,
+        (zoneSets.get(exercise.muscle_group) ?? 0) + 1,
+      );
     }
   }
 
@@ -456,7 +548,8 @@ export async function computeAthleteDashboard(
     rpesBySession.set(se.session_id, list);
   }
 
-  // UA par séance sur 28 j (pour ACWR) + période affichée
+  // UA Foster (primaire = RPE séance) + UA moy. exercices (complémentaire)
+  // + activités libres, sur 28 j (ACWR) + période affichée
   const acwrFrom = addDaysISO(today, -27);
   const allSessionUas: SessionUa[] = [];
 
@@ -490,7 +583,8 @@ export async function computeAthleteDashboard(
     const ua = avgRpe != null ? sessionLoadUnits(minutes, avgRpe) : 0;
     const uaFinal =
       finalRpe != null ? sessionLoadUnits(minutes, finalRpe) : 0;
-    if (ua <= 0 && uaFinal <= 0) continue;
+    const load = uaFinal > 0 ? uaFinal : ua;
+    if (load <= 0) continue;
 
     allSessionUas.push({
       sessionId,
@@ -498,8 +592,35 @@ export async function computeAthleteDashboard(
       date,
       ua,
       uaFinal,
+      load,
       avgRpe: avgRpe != null ? round1(avgRpe) : null,
       finalRpe,
+    });
+  }
+
+  const activityRows = (activitiesData ?? []) as AthleteActivity[];
+  for (const activity of activityRows) {
+    if (activity.rpe == null || activity.rpe <= 0) continue;
+    if (
+      activity.performed_on < acwrFrom ||
+      activity.performed_on > today
+    ) {
+      continue;
+    }
+    const uaFinal = sessionLoadUnits(
+      activity.duration_minutes,
+      activity.rpe,
+    );
+    if (uaFinal <= 0) continue;
+    allSessionUas.push({
+      sessionId: `activity:${activity.id}`,
+      title: activity.name,
+      date: activity.performed_on,
+      ua: 0,
+      uaFinal,
+      load: uaFinal,
+      avgRpe: null,
+      finalRpe: activity.rpe,
     });
   }
 
@@ -580,6 +701,7 @@ export async function computeAthleteDashboard(
         zonesTotal > 0
           ? Math.round((tonnageKg / zonesTotal) * 1000) / 10
           : 0,
+      setsCount: zoneSets.get(zone) ?? 0,
     }))
     .sort((a, b) => b.tonnageKg - a.tonnageKg);
 
@@ -593,19 +715,9 @@ export async function computeAthleteDashboard(
     completedIds.has(session.id),
   ).length;
 
-  const periodRpes = periodSessions
-    .map((session) => session.avgRpe)
+  const periodFinalRpes = periodSessions
+    .map((session) => session.finalRpe)
     .filter((value): value is number => value != null);
-  const feelingScoreValues: number[] = [];
-  for (let i = 0; i < allEnergy.length; i += 1) {
-    feelingScoreValues.push(
-      (allEnergy[i] +
-        allSleep[i] +
-        allMotivation[i] +
-        (6 - allPain[i])) /
-        4,
-    );
-  }
 
   return {
     period,
@@ -615,15 +727,21 @@ export async function computeAthleteDashboard(
       sessionsCompleted,
       sessionsPlanned,
       volumeKg: Math.round(zonesTotal),
-      avgRpe: avg(periodRpes),
-      feelingScore: avg(feelingScoreValues),
+      avgRpe: avg(periodFinalRpes),
+      feelingScore: periodFeelingScore,
     },
     feeling: {
-      energy: avg(allEnergy),
+      fatigue: avg(allFatigue),
       sleep: avg(allSleep),
-      pain: avg(allPain),
-      motivation: avg(allMotivation),
-      count: allEnergy.length,
+      soreness: avg(allSoreness),
+      stress: avg(allStress),
+      mood: avg(allMood),
+      totalScore: periodFeelingScore,
+      baselineMean: baselineMean != null ? round1(baselineMean) : null,
+      baselineSd: baselineSd != null ? round1(baselineSd) : null,
+      alertThreshold,
+      alert: feelingAlert,
+      count: periodTotals.length,
     },
     feelingSeries,
     zones,

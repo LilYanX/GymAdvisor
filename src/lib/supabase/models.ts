@@ -63,7 +63,7 @@ export type CheckIn = Tables<"check_ins">;
 export type CheckInInsert = TablesInsert<"check_ins">;
 export type CheckInUpdate = TablesUpdate<"check_ins">;
 
-/** Ressenti en début de séance (énergie, sommeil, douleurs, motivation). */
+/** Questionnaire McLean pré-séance (fatigue, sommeil, courbatures, stress, humeur). */
 export type SessionCheckIn = Tables<"session_check_ins">;
 export type SessionCheckInInsert = TablesInsert<"session_check_ins">;
 

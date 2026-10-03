@@ -32,7 +32,8 @@ export default function RgpdPage() {
           libres
         </li>
         <li>
-          Ressentis pré-séance (énergie, sommeil, douleurs, motivation) et
+          Ressentis pré-séance McLean (fatigue, sommeil, courbatures, stress,
+          humeur) et
           commentaires éventuels
         </li>
         <li>Données techniques : cookies de session, journaux de connexion</li>

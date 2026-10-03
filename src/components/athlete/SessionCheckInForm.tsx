@@ -6,22 +6,29 @@ import {
   submitSessionCheckIn,
   type SessionCheckInState,
 } from "@/lib/actions/session-checkin";
+import { MCLEAN_ITEMS } from "@/lib/mclean";
 import { toDatetimeLocalValue } from "@/lib/session-timing";
 import { FixedBottomBar } from "@/components/layout/FixedBottomBar";
 import { useLoadingActive } from "@/components/layout/LoadingProvider";
 
 const initial: SessionCheckInState = { error: null, ok: false };
 
-function Scale({
+function McLeanScale({
   name,
   label,
+  hints,
 }: {
   name: string;
   label: string;
+  hints: readonly string[];
 }) {
+  const [selected, setSelected] = useState<number | null>(null);
   return (
     <fieldset>
       <legend className="text-sm font-medium">{label}</legend>
+      <p className="mt-1 min-h-[1.25rem] text-xs text-ga-muted">
+        {selected != null ? hints[selected - 1] : "1 = pire · 5 = meilleur"}
+      </p>
       <div className="mt-2 flex gap-2">
         {[1, 2, 3, 4, 5].map((value) => (
           <label key={value} className="flex-1">
@@ -31,6 +38,7 @@ function Scale({
               value={value}
               className="peer sr-only"
               required
+              onChange={() => setSelected(value)}
             />
             <span className="flex h-10 items-center justify-center rounded-lg bg-ga-elevated text-sm text-ga-muted peer-checked:bg-ga-lime peer-checked:font-semibold peer-checked:text-black">
               {value}
@@ -65,6 +73,10 @@ export function SessionCheckInForm({
       <div className="px-5 pb-32 pt-8">
         <p className="text-sm text-ga-muted">{sessionTitle}</p>
         <h1 className="mt-1 text-2xl font-semibold">Comment tu te sens ?</h1>
+        <p className="mt-2 text-sm text-ga-muted">
+          Questionnaire McLean — avant l’entraînement (1 = pire état, 5 =
+          meilleur).
+        </p>
 
         <form
           id="session-checkin-form"
@@ -83,10 +95,14 @@ export function SessionCheckInForm({
               className="mt-2 w-full rounded-xl border border-ga-border bg-ga-elevated px-3 py-2.5 text-sm outline-none focus:border-ga-lime"
             />
           </label>
-          <Scale name="energy" label="Énergie" />
-          <Scale name="sleep" label="Sommeil" />
-          <Scale name="pain" label="Douleurs" />
-          <Scale name="motivation" label="Motivation" />
+          {MCLEAN_ITEMS.map((item) => (
+            <McLeanScale
+              key={item.key}
+              name={item.key}
+              label={item.label}
+              hints={item.hints}
+            />
+          ))}
           <label className="text-sm">
             <span>Un mot pour {coachFirstName}</span>
             <textarea

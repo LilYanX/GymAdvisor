@@ -442,8 +442,8 @@ export function AthleteDetailView({
                   <p className="mt-0.5 font-semibold text-ga-red">Attention</p>
                 ) : null}
                 <p className="mt-1 text-ga-fg">
-                  E{feeling.energy} · S{feeling.sleep} · D{feeling.pain} · M
-                  {feeling.motivation}
+                  E{feeling.fatigue} · S{feeling.sleep} · C{feeling.soreness} · St
+                  {feeling.stress} · H{feeling.mood}
                 </p>
               </article>
             ))}

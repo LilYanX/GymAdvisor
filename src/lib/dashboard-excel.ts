@@ -106,14 +106,14 @@ export async function buildDashboardWorkbook(
   dash.getCell("A8").font = { italic: true, size: 9, color: { argb: "FF5B6470" } };
   dash.mergeCells("A8:H8");
 
-  dash.getCell("A10").value = "Énergie";
-  dash.getCell("B10").value = metrics.feeling.energy;
+  dash.getCell("A10").value = "Fatigue";
+  dash.getCell("B10").value = metrics.feeling.fatigue;
   dash.getCell("C10").value = "Sommeil";
   dash.getCell("D10").value = metrics.feeling.sleep;
-  dash.getCell("E10").value = "Douleurs";
-  dash.getCell("F10").value = metrics.feeling.pain;
-  dash.getCell("G10").value = "Motivation";
-  dash.getCell("H10").value = metrics.feeling.motivation;
+  dash.getCell("E10").value = "Courbatures";
+  dash.getCell("F10").value = metrics.feeling.soreness;
+  dash.getCell("G10").value = "Stress";
+  dash.getCell("H10").value = metrics.feeling.stress;
 
   // Mini tableau zones top 4 sur le dashboard
   dash.getCell("A12").value = "Top zones (tonnage)";
@@ -155,65 +155,72 @@ export async function buildDashboardWorkbook(
   const feelingSheet = workbook.addWorksheet("Ressenti");
   feelingSheet.addRow([
     "Période",
-    "Énergie",
+    "Fatigue",
     "Sommeil",
-    "Douleurs",
-    "Motivation",
-    "Nb check-ins",
-    "Score ressenti",
+    "Courbatures",
+    "Stress",
+    "Humeur",
+    "Score total",
+    "Nb",
   ]);
-  styleHeaderRow(feelingSheet.getRow(1), 7);
+  styleHeaderRow(feelingSheet.getRow(1), 8);
   feelingSheet.addRow([
     `${metrics.from} → ${metrics.to}`,
-    metrics.feeling.energy,
+    metrics.feeling.fatigue,
     metrics.feeling.sleep,
-    metrics.feeling.pain,
-    metrics.feeling.motivation,
+    metrics.feeling.soreness,
+    metrics.feeling.stress,
+    metrics.feeling.mood,
+    metrics.feeling.totalScore,
     metrics.feeling.count,
-    metrics.kpis.feelingScore,
   ]);
   feelingSheet.addRow([]);
   feelingSheet.addRow([
-    "KPI séances",
+    "KPI séances réalisées/prévues",
     `${metrics.kpis.sessionsCompleted}/${metrics.kpis.sessionsPlanned}`,
   ]);
   feelingSheet.addRow(["KPI volume kg", metrics.kpis.volumeKg]);
-  feelingSheet.addRow(["KPI RPE moyen", metrics.kpis.avgRpe]);
+  feelingSheet.addRow(["KPI RPE séance moy.", metrics.kpis.avgRpe]);
+  feelingSheet.addRow(["Baseline McLean", metrics.feeling.baselineMean]);
+  feelingSheet.addRow(["Seuil alerte", metrics.feeling.alertThreshold]);
   feelingSheet.addRow([]);
   const feelTableStart = feelingSheet.rowCount + 1;
   if (metrics.feelingSeries.length > 0) {
     feelingSheet.addTable({
       name: "TbRessentiSerie",
-      ref: `A${feelTableStart}:F${feelTableStart + metrics.feelingSeries.length}`,
+      ref: `A${feelTableStart}:G${feelTableStart + metrics.feelingSeries.length}`,
       headerRow: true,
       style: { theme: "TableStyleMedium2", showRowStripes: true },
       columns: [
         { name: "Bucket" },
-        { name: "Énergie" },
+        { name: "Score" },
+        { name: "Fatigue" },
         { name: "Sommeil" },
-        { name: "Douleurs" },
-        { name: "Motivation" },
-        { name: "Nb" },
+        { name: "Courbatures" },
+        { name: "Stress" },
+        { name: "Humeur" },
       ],
       rows: metrics.feelingSeries.map((point) => [
         point.label,
-        point.energy,
+        point.totalScore,
+        point.fatigue,
         point.sleep,
-        point.pain,
-        point.motivation,
-        point.count,
+        point.soreness,
+        point.stress,
+        point.mood,
       ]),
     });
   } else {
     feelingSheet.addRow([
       "Bucket",
-      "Énergie",
+      "Score",
+      "Fatigue",
       "Sommeil",
-      "Douleurs",
-      "Motivation",
-      "Nb",
+      "Courbatures",
+      "Stress",
+      "Humeur",
     ]);
-    styleHeaderRow(feelingSheet.getRow(feelTableStart), 6);
+    styleHeaderRow(feelingSheet.getRow(feelTableStart), 7);
   }
   autosize(feelingSheet);
 
@@ -265,23 +272,25 @@ export async function buildDashboardWorkbook(
   if (metrics.zones.length > 0) {
     zonesSheet.addTable({
       name: "TbZones",
-      ref: `A1:C${1 + metrics.zones.length}`,
+      ref: `A1:D${1 + metrics.zones.length}`,
       headerRow: true,
       style: { theme: "TableStyleMedium2", showRowStripes: true },
       columns: [
         { name: "Zone" },
         { name: "Tonnage (kg)" },
         { name: "%" },
+        { name: "Séries" },
       ],
       rows: metrics.zones.map((zone) => [
         zone.label,
         zone.tonnageKg,
         zone.percent,
+        zone.setsCount,
       ]),
     });
   } else {
-    zonesSheet.addRow(["Zone", "Tonnage (kg)", "%"]);
-    styleHeaderRow(zonesSheet.getRow(1), 3);
+    zonesSheet.addRow(["Zone", "Tonnage (kg)", "%", "Séries"]);
+    styleHeaderRow(zonesSheet.getRow(1), 4);
   }
   autosize(zonesSheet);
 

@@ -10,15 +10,16 @@ import type {
 import { formatDayMonth } from "@/lib/dates";
 import {
   AcwrGauge,
-  FeelingRadar,
+  FeelingWellnessChart,
   UaRpeChart,
 } from "@/components/dashboard/ChartPrimitives";
 
-const FEELING_KEYS = [
-  { key: "energy" as const, label: "Énergie" },
+const MCLEAN_KEYS = [
+  { key: "fatigue" as const, label: "Fatigue" },
   { key: "sleep" as const, label: "Sommeil" },
-  { key: "pain" as const, label: "Douleurs" },
-  { key: "motivation" as const, label: "Motivation" },
+  { key: "soreness" as const, label: "Courbatures" },
+  { key: "stress" as const, label: "Stress" },
+  { key: "mood" as const, label: "Humeur" },
 ];
 
 const PERIOD_TABS: { id: DashboardPeriod; label: string; title: string }[] = [
@@ -37,12 +38,14 @@ function BarRow({
   max,
   suffix = "",
   color = "bg-ga-lime",
+  detail,
 }: {
   label: string;
   value: number;
   max: number;
   suffix?: string;
   color?: string;
+  detail?: string;
 }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
@@ -52,6 +55,9 @@ function BarRow({
         <span className="shrink-0 font-medium text-ga-fg">
           {value.toLocaleString("fr-FR")}
           {suffix}
+          {detail ? (
+            <span className="ml-1 font-normal text-ga-muted">{detail}</span>
+          ) : null}
         </span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-ga-elevated">
@@ -66,37 +72,57 @@ function BarRow({
 
 function FeelingPanel({
   metrics,
-  compact,
 }: {
   metrics: AthleteDashboardMetrics;
   compact?: boolean;
 }) {
-  const axes = FEELING_KEYS.map((item) => ({
-    key: item.key,
-    label: item.label,
-    value: metrics.feeling[item.key],
-  }));
+  const hasScores = metrics.feelingSeries.some((p) => p.totalScore != null);
 
   return (
-    <div className={`flex h-full flex-col ${compact ? "gap-3" : "gap-4"}`}>
-      <FeelingRadar axes={axes} size={compact ? 180 : 220} />
-      <div className="mt-auto space-y-2">
-        <div className="grid grid-cols-2 gap-2">
-          {FEELING_KEYS.map((item) => (
-            <div
-              key={item.key}
-              className="rounded-lg bg-ga-elevated px-2.5 py-2 text-center"
-            >
-              <p className="text-[10px] uppercase tracking-wide text-ga-muted">
-                {item.label}
-              </p>
-              <p className="mt-0.5 text-sm font-semibold">
-                {formatScore(metrics.feeling[item.key])}
-                <span className="text-[11px] font-normal text-ga-muted">/5</span>
-              </p>
-            </div>
-          ))}
-        </div>
+    <div className="flex h-full flex-col gap-3">
+      {!hasScores ? (
+        <p className="text-sm text-ga-muted">
+          Aucun questionnaire McLean sur la période.
+        </p>
+      ) : (
+        <FeelingWellnessChart
+          points={metrics.feelingSeries}
+          baselineMean={metrics.feeling.baselineMean}
+          baselineSd={metrics.feeling.baselineSd}
+          alertThreshold={metrics.feeling.alertThreshold}
+        />
+      )}
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm">
+          <span className="text-2xl font-semibold text-ga-fg">
+            {formatScore(metrics.feeling.totalScore)}
+          </span>
+          <span className="ml-1 text-ga-muted">/25</span>
+        </p>
+        {metrics.feeling.alert ? (
+          <span className="rounded-md bg-ga-red/15 px-2 py-0.5 text-[11px] font-medium text-ga-red">
+            Alerte (sous moyenne − 1σ)
+          </span>
+        ) : metrics.feeling.alertThreshold != null ? (
+          <span className="text-[11px] text-ga-muted">
+            Seuil {metrics.feeling.alertThreshold.toFixed(1)}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-auto grid grid-cols-5 gap-1.5">
+        {MCLEAN_KEYS.map((item) => (
+          <div
+            key={item.key}
+            className="rounded-lg bg-ga-elevated px-1.5 py-2 text-center"
+          >
+            <p className="truncate text-[9px] uppercase tracking-wide text-ga-muted">
+              {item.label}
+            </p>
+            <p className="mt-0.5 text-sm font-semibold">
+              {formatScore(metrics.feeling[item.key])}
+            </p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -122,6 +148,7 @@ function ZonesPanel({ metrics }: { metrics: AthleteDashboardMetrics }) {
             value={zone.tonnageKg}
             max={max}
             suffix=" kg"
+            detail={`· ${zone.setsCount} sér.`}
           />
         ))}
       </div>
@@ -138,6 +165,9 @@ function ZonesPanel({ metrics }: { metrics: AthleteDashboardMetrics }) {
               {zone.percent.toLocaleString("fr-FR")}
               <span className="text-[11px] font-normal text-ga-muted">%</span>
             </p>
+            <p className="text-[10px] text-ga-muted">
+              {zone.setsCount} série{zone.setsCount > 1 ? "s" : ""}
+            </p>
           </div>
         ))}
       </div>
@@ -153,7 +183,7 @@ function UaPanel({ metrics }: { metrics: AthleteDashboardMetrics }) {
   ) {
     return (
       <p className="text-sm text-ga-muted">
-        Aucune UA calculable (durée × RPE / 10).
+        Aucune UA calculable (Foster : durée × RPE séance).
       </p>
     );
   }
@@ -164,30 +194,30 @@ function UaPanel({ metrics }: { metrics: AthleteDashboardMetrics }) {
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
           <p>
             <span className="text-2xl font-semibold text-ga-fg">
-              {metrics.uaTotal.toLocaleString("fr-FR")}
-            </span>
-            <span className="ml-1 text-ga-muted">UA moy.</span>
-          </p>
-          <p>
-            <span className="text-2xl font-semibold text-ga-fg">
               {metrics.uaFinalTotal.toLocaleString("fr-FR")}
             </span>
-            <span className="ml-1 text-ga-muted">UA final</span>
+            <span className="ml-1 text-ga-muted">UA Foster</span>
+          </p>
+          <p>
+            <span className="text-lg font-semibold text-ga-fg">
+              {metrics.uaTotal.toLocaleString("fr-FR")}
+            </span>
+            <span className="ml-1 text-ga-muted">UA moy. exo</span>
           </p>
         </div>
         <div className="flex items-center gap-3 text-[10px] text-ga-muted">
           <span className="inline-flex items-center gap-1">
-            <span className="inline-block h-2 w-2 rounded-sm bg-ga-blue" />
-            RPE moy.
+            <span className="inline-block h-2 w-2 rounded-sm bg-ga-lime" />
+            RPE séance
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="inline-block h-2 w-2 rounded-sm bg-ga-lime" />
-            RPE final
+            <span className="inline-block h-2 w-2 rounded-sm bg-ga-blue" />
+            RPE moy. exo
           </span>
         </div>
       </div>
       {metrics.uaSeries.length === 0 ? (
-        <p className="text-sm text-ga-muted">Aucune séance sur la période.</p>
+        <p className="text-sm text-ga-muted">Aucune charge sur la période.</p>
       ) : (
         <UaRpeChart points={metrics.uaSeries} />
       )}
@@ -196,6 +226,7 @@ function UaPanel({ metrics }: { metrics: AthleteDashboardMetrics }) {
           ratio={metrics.acwr.ratio}
           acute={metrics.acwr.acute}
           chronic={metrics.acwr.chronic}
+          sufficientData={metrics.acwr.sufficientData}
         />
       </div>
     </div>
@@ -334,7 +365,7 @@ export function AthleteMetricsDashboard({
       <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
         <div className="rounded-lg bg-ga-elevated/70 px-3 py-2.5">
           <p className="text-[10px] uppercase tracking-wide text-ga-muted">
-            Séances
+            Séances réalisées / prévues
           </p>
           <p className="mt-0.5 text-lg font-semibold tabular-nums">
             {metrics.kpis.sessionsCompleted}
@@ -354,7 +385,7 @@ export function AthleteMetricsDashboard({
         </div>
         <div className="rounded-lg bg-ga-elevated/70 px-3 py-2.5">
           <p className="text-[10px] uppercase tracking-wide text-ga-muted">
-            RPE moyen
+            RPE séance moy.
           </p>
           <p className="mt-0.5 text-lg font-semibold tabular-nums">
             {formatScore(metrics.kpis.avgRpe)}
@@ -365,12 +396,12 @@ export function AthleteMetricsDashboard({
         </div>
         <div className="rounded-lg bg-ga-elevated/70 px-3 py-2.5">
           <p className="text-[10px] uppercase tracking-wide text-ga-muted">
-            Score ressenti
+            Score McLean
           </p>
           <p className="mt-0.5 text-lg font-semibold tabular-nums">
             {formatScore(metrics.kpis.feelingScore)}
             {metrics.kpis.feelingScore != null ? (
-              <span className="text-xs font-normal text-ga-muted">/5</span>
+              <span className="text-xs font-normal text-ga-muted">/25</span>
             ) : null}
           </p>
         </div>
@@ -385,7 +416,7 @@ export function AthleteMetricsDashboard({
       >
         <div className="flex flex-col rounded-xl border border-ga-border/80 bg-ga-elevated/40 p-3">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ga-muted">
-            Ressenti pré-séance
+            Bien-être McLean
           </h3>
           <div className="mt-2 flex min-h-0 flex-1 flex-col">
             <FeelingPanel metrics={metrics} compact={compact} />
@@ -403,10 +434,6 @@ export function AthleteMetricsDashboard({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ga-muted">
             Charges en UA
           </h3>
-          <p className="mt-1 text-[11px] text-ga-muted">
-            {period === "month" ? "Par semaine" : "Par séance"} · min × RPE / 10
-            (moy. exercices vs final)
-          </p>
           <div className="mt-3 flex min-h-0 flex-1 flex-col">
             <UaPanel metrics={metrics} />
           </div>

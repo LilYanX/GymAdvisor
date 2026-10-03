@@ -2,6 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAthlete } from "@/lib/auth";
+import {
+  mcleanNeedsAttention,
+  mcleanTotal,
+  type McLeanScores,
+} from "@/lib/mclean";
 import { parseDatetimeLocal } from "@/lib/session-timing";
 import { createClient } from "@/lib/supabase/server";
 
@@ -10,18 +15,8 @@ export type SessionCheckInState = {
   ok: boolean;
 };
 
-function isLowFeeling(input: {
-  energy: number;
-  sleep: number;
-  pain: number;
-  motivation: number;
-}): boolean {
-  return (
-    input.energy <= 2 ||
-    input.sleep <= 2 ||
-    input.motivation <= 2 ||
-    input.pain >= 4
-  );
+function parseItem(formData: FormData, key: string): number {
+  return Number(formData.get(key));
 }
 
 export async function submitSessionCheckIn(
@@ -34,10 +29,13 @@ export async function submitSessionCheckIn(
   }
 
   const sessionId = String(formData.get("session_id") ?? "");
-  const energy = Number(formData.get("energy"));
-  const sleep = Number(formData.get("sleep"));
-  const pain = Number(formData.get("pain"));
-  const motivation = Number(formData.get("motivation"));
+  const scores: McLeanScores = {
+    fatigue: parseItem(formData, "fatigue"),
+    sleep: parseItem(formData, "sleep"),
+    soreness: parseItem(formData, "soreness"),
+    stress: parseItem(formData, "stress"),
+    mood: parseItem(formData, "mood"),
+  };
   const comment = String(formData.get("comment") ?? "").trim();
   const startedAtLocal = String(formData.get("started_at") ?? "").trim();
 
@@ -46,12 +44,12 @@ export async function submitSessionCheckIn(
   }
 
   if (
-    ![energy, sleep, pain, motivation].every(
+    !Object.values(scores).every(
       (value) => Number.isInteger(value) && value >= 1 && value <= 5,
     )
   ) {
     return {
-      error: "Indique énergie, sommeil, douleurs et motivation (1 à 5).",
+      error: "Réponds aux 5 questions McLean (1 à 5).",
       ok: false,
     };
   }
@@ -62,16 +60,36 @@ export async function submitSessionCheckIn(
   }
 
   const supabase = await createClient();
-  const needsAttention = isLowFeeling({ energy, sleep, pain, motivation });
+
+  const { data: history } = await supabase
+    .from("session_check_ins")
+    .select("fatigue, sleep, soreness, stress, mood")
+    .eq("athlete_id", athlete.id)
+    .neq("session_id", sessionId)
+    .order("created_at", { ascending: false })
+    .limit(28);
+
+  const historyTotals = (history ?? []).map((row) =>
+    mcleanTotal({
+      fatigue: row.fatigue,
+      sleep: row.sleep,
+      soreness: row.soreness,
+      stress: row.stress,
+      mood: row.mood,
+    }),
+  );
+  const total = mcleanTotal(scores);
+  const needsAttention = mcleanNeedsAttention(total, historyTotals);
 
   const { error } = await supabase.from("session_check_ins").upsert(
     {
       athlete_id: athlete.id,
       session_id: sessionId,
-      energy,
-      sleep,
-      pain,
-      motivation,
+      fatigue: scores.fatigue,
+      sleep: scores.sleep,
+      soreness: scores.soreness,
+      stress: scores.stress,
+      mood: scores.mood,
       comment,
       needs_attention: needsAttention,
     },

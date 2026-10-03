@@ -31,10 +31,12 @@ export async function createAthleteActivity(input: {
     return { error: "La durée doit être un nombre positif." };
   }
   if (
-    input.rpe != null &&
-    (!Number.isInteger(input.rpe) || input.rpe < 1 || input.rpe > 10)
+    input.rpe == null ||
+    !Number.isInteger(input.rpe) ||
+    input.rpe < 1 ||
+    input.rpe > 10
   ) {
-    return { error: "Le RPE doit être entre 1 et 10." };
+    return { error: "Le RPE de séance (1–10) est obligatoire pour l’UA." };
   }
 
   const performedOn = input.performedOn ?? todayISO();
@@ -108,10 +110,12 @@ export async function updateAthleteActivity(input: {
     return { error: "La durée doit être un nombre positif." };
   }
   if (
-    input.rpe != null &&
-    (!Number.isInteger(input.rpe) || input.rpe < 1 || input.rpe > 10)
+    input.rpe == null ||
+    !Number.isInteger(input.rpe) ||
+    input.rpe < 1 ||
+    input.rpe > 10
   ) {
-    return { error: "Le RPE doit être entre 1 et 10." };
+    return { error: "Le RPE de séance (1–10) est obligatoire pour l’UA." };
   }
   if (!input.performedOn) return { error: "Indique une date." };
 

@@ -155,7 +155,7 @@ export async function getDashboardData(coachId: string): Promise<DashboardData> 
         athleteId: row.id,
         kind: "feeling",
         title: `Ressenti bas — ${row.firstName}`,
-        detail: "Énergie, sommeil, motivation ou douleurs à surveiller",
+        detail: "Score McLean sous la moyenne personnelle (fatigue, sommeil, courbatures, stress, humeur)",
         href: `/sportifs/${row.id}`,
       });
     }

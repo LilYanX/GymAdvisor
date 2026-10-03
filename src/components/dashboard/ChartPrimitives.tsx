@@ -249,10 +249,12 @@ export function AcwrGauge({
   ratio,
   acute,
   chronic,
+  sufficientData = true,
 }: {
   ratio: number | null;
   acute: number;
   chronic: number;
+  sufficientData?: boolean;
 }) {
   const width = 280;
   const height = 56;
@@ -261,7 +263,9 @@ export function AcwrGauge({
   const trackX = 12;
   const trackW = width - 24;
   const maxRatio = 2;
-  const clamped = ratio == null ? null : Math.max(0, Math.min(maxRatio, ratio));
+  const showNeedle = sufficientData && ratio != null;
+  const clamped =
+    !showNeedle || ratio == null ? null : Math.max(0, Math.min(maxRatio, ratio));
   const needleX =
     clamped == null ? null : trackX + (clamped / maxRatio) * trackW;
 
@@ -274,10 +278,10 @@ export function AcwrGauge({
   ];
 
   let status = "Données insuffisantes";
-  if (ratio != null) {
+  if (sufficientData && ratio != null) {
     if (ratio < 0.8) status = "Sous-charge";
     else if (ratio <= 1.3) status = "Zone optimale";
-    else if (ratio <= 1.5) status = "Charge élevée";
+    else if (ratio <= 1.5) status = "Vigilance";
     else status = "Risque élevé";
   }
 
@@ -288,7 +292,7 @@ export function AcwrGauge({
           Ratio aigu / chronique
         </p>
         <p className="text-sm font-semibold text-ga-fg">
-          {ratio == null ? "—" : ratio.toFixed(1)}
+          {!sufficientData || ratio == null ? "—" : ratio.toFixed(1)}
           <span className="ml-1 text-[11px] font-normal text-ga-muted">
             {status}
           </span>
@@ -356,6 +360,164 @@ export function AcwrGauge({
           </g>
         ) : null}
       </svg>
+      {!sufficientData ? (
+        <p className="text-[11px] text-ga-muted"></p>
+      ) : (
+        <p className="text-[11px] text-ga-muted">
+          Aigu {acute.toLocaleString("fr-FR")} · Chronique{" "}
+          {chronic.toLocaleString("fr-FR")} / sem
+        </p>
+      )}
     </div>
+  );
+}
+
+/** Courbe quotidienne du score McLean (5–25) avec bande de zone normale. */
+export function FeelingWellnessChart({
+  points,
+  baselineMean,
+  baselineSd,
+  alertThreshold,
+}: {
+  points: Array<{ key: string; label: string; totalScore: number | null }>;
+  baselineMean: number | null;
+  baselineSd: number | null;
+  alertThreshold: number | null;
+}) {
+  const width = 320;
+  const height = 160;
+  const padL = 28;
+  const padR = 12;
+  const padT = 14;
+  const padB = 28;
+  const chartW = width - padL - padR;
+  const chartH = height - padT - padB;
+  const yMin = 5;
+  const yMax = 25;
+
+  function yFor(score: number): number {
+    return padT + chartH - ((score - yMin) / (yMax - yMin)) * chartH;
+  }
+
+  const scored = points
+    .map((point, index) => {
+      if (point.totalScore == null) return null;
+      const x =
+        points.length <= 1
+          ? padL + chartW / 2
+          : padL + (index / (points.length - 1)) * chartW;
+      return { x, y: yFor(point.totalScore), score: point.totalScore, label: point.label };
+    })
+    .filter((p): p is { x: number; y: number; score: number; label: string } => p != null);
+
+  const linePath =
+    scored.length > 1
+      ? scored.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ")
+      : "";
+
+  const bandTop =
+    baselineMean != null && baselineSd != null
+      ? Math.min(25, baselineMean + baselineSd)
+      : null;
+  const bandBottom =
+    alertThreshold != null
+      ? alertThreshold
+      : baselineMean != null && baselineSd != null
+        ? Math.max(5, baselineMean - baselineSd)
+        : null;
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="h-44 w-full"
+      role="img"
+      aria-label="Score McLean quotidien"
+    >
+      {bandTop != null && bandBottom != null ? (
+        <rect
+          x={padL}
+          y={yFor(bandTop)}
+          width={chartW}
+          height={Math.max(2, yFor(bandBottom) - yFor(bandTop))}
+          fill="var(--ga-lime)"
+          opacity={0.12}
+        />
+      ) : null}
+      {alertThreshold != null ? (
+        <line
+          x1={padL}
+          y1={yFor(alertThreshold)}
+          x2={width - padR}
+          y2={yFor(alertThreshold)}
+          stroke="var(--ga-red)"
+          strokeWidth="1"
+          strokeDasharray="4 3"
+          opacity={0.7}
+        />
+      ) : null}
+      {[5, 15, 25].map((tick) => (
+        <g key={tick}>
+          <line
+            x1={padL}
+            y1={yFor(tick)}
+            x2={width - padR}
+            y2={yFor(tick)}
+            stroke="var(--ga-border)"
+            strokeWidth="1"
+            opacity={0.45}
+          />
+          <text
+            x={padL - 4}
+            y={yFor(tick)}
+            textAnchor="end"
+            dominantBaseline="middle"
+            fill="var(--ga-muted)"
+            fontSize="8"
+          >
+            {tick}
+          </text>
+        </g>
+      ))}
+      {linePath ? (
+        <path
+          d={linePath}
+          fill="none"
+          stroke="var(--ga-lime)"
+          strokeWidth="2"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      ) : null}
+      {scored.map((point) => (
+        <circle
+          key={`${point.x}-${point.score}`}
+          cx={point.x}
+          cy={point.y}
+          r="3.5"
+          fill="var(--ga-lime)"
+        />
+      ))}
+      {points.length > 0 ? (
+        <>
+          <text
+            x={padL}
+            y={height - 8}
+            fill="var(--ga-muted)"
+            fontSize="8"
+          >
+            {points[0].label}
+          </text>
+          <text
+            x={width - padR}
+            y={height - 8}
+            textAnchor="end"
+            fill="var(--ga-muted)"
+            fontSize="8"
+          >
+            {points[points.length - 1].label}
+          </text>
+        </>
+      ) : null}
+    </svg>
   );
 }

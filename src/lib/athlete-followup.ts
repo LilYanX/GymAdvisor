@@ -265,10 +265,13 @@ export async function getAthleteFollowUp(
       sessionLog?.completed_at,
     );
     const minutes = actualMinutes ?? session.estimated_minutes ?? 0;
-    const loadUnits = sessionLoadUnits(minutes, avgRpe);
     const finalRpe = sessionLog?.final_rpe ?? null;
     const loadUnitsFinal =
       finalRpe != null ? sessionLoadUnits(minutes, finalRpe) : 0;
+    const loadUnits =
+      loadUnitsFinal > 0
+        ? loadUnitsFinal
+        : sessionLoadUnits(minutes, avgRpe);
     const completed = sessionLog?.status === "completed";
 
     if (
