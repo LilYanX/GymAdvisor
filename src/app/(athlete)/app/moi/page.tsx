@@ -6,6 +6,7 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { AthleteMetricsDashboard } from "@/components/dashboard/AthleteMetricsDashboard";
 import { AthleteProfileEditor } from "@/components/athlete/AthleteProfileEditor";
 import { getAthleteBodyLogs } from "@/lib/actions/athlete-profile";
+import { getAthleteCumulativeLoadSessions } from "@/lib/athlete-load-sessions";
 
 function initials(firstName: string, lastName: string): string {
   const a = firstName.trim().charAt(0);
@@ -33,9 +34,10 @@ export default async function MoiPage({ searchParams }: Props) {
         )
       : 0;
 
-  const [dashboard, bodyLogs] = await Promise.all([
+  const [dashboard, bodyLogs, loadSessions] = await Promise.all([
     getAthleteDashboardBundle(athlete.id, referenceDate),
     getAthleteBodyLogs(athlete.id),
+    getAthleteCumulativeLoadSessions(athlete.id),
   ]);
 
   return (
@@ -58,11 +60,7 @@ export default async function MoiPage({ searchParams }: Props) {
         </div>
       </header>
 
-      <div className="mt-8">
-        <AthleteProfileEditor athlete={athlete} bodyLogs={bodyLogs} />
-      </div>
-
-      <section className="mt-4 overflow-hidden rounded-2xl border border-ga-border bg-ga-card">
+      <section className="mt-8 overflow-hidden rounded-2xl border border-ga-border bg-ga-card">
         <div className="px-4 py-3.5">
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-xs uppercase tracking-wide text-ga-muted">
@@ -85,6 +83,14 @@ export default async function MoiPage({ searchParams }: Props) {
           </div>
         </div>
       </section>
+
+      <div className="mt-4">
+        <AthleteProfileEditor
+          athlete={athlete}
+          bodyLogs={bodyLogs}
+          loadSessions={loadSessions}
+        />
+      </div>
 
       <div className="mt-4">
         <AthleteMetricsDashboard bundle={dashboard} variant="athlete" />

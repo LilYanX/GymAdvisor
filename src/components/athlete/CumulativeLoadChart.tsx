@@ -1,7 +1,12 @@
 "use client";
 
-import type { TonnageSession } from "@/lib/athlete-followup-types";
 import { formatDayMonth } from "@/lib/dates";
+
+export type CumulativeLoadSession = {
+  sessionId: string;
+  date: string | null;
+  tonnageKg: number;
+};
 
 type Point = {
   id: string;
@@ -9,15 +14,15 @@ type Point = {
   cumulativeKg: number;
 };
 
-function loadTicks(min: number, max: number): number[] {
+function loadTicks(min: number, max: number, compact: boolean): number[] {
   if (max <= min) return [min];
-  if (Math.abs(max - min) < 1) return [min, max];
+  if (compact || Math.abs(max - min) < 1) return [min, max];
   const mid = Math.round((min + max) / 2);
   if (Math.abs(mid - min) < 1 || Math.abs(mid - max) < 1) return [min, max];
   return [min, mid, max];
 }
 
-function buildCumulativePoints(sessions: TonnageSession[]): Point[] {
+function buildCumulativePoints(sessions: CumulativeLoadSession[]): Point[] {
   const ordered = [...sessions]
     .filter((session) => session.date && session.tonnageKg > 0)
     .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
@@ -35,8 +40,10 @@ function buildCumulativePoints(sessions: TonnageSession[]): Point[] {
 
 export function CumulativeLoadChart({
   sessions,
+  compact = false,
 }: {
-  sessions: TonnageSession[];
+  sessions: CumulativeLoadSession[];
+  compact?: boolean;
 }) {
   const pointsData = buildCumulativePoints(sessions);
 
@@ -56,15 +63,17 @@ export function CumulativeLoadChart({
   const yMax = max + pad;
   const range = yMax - yMin || 1;
 
-  const width = 720;
-  const height = 280;
-  const left = 64;
-  const right = 24;
-  const top = 20;
-  const bottom = 40;
+  const width = compact ? 360 : 720;
+  const height = compact ? 200 : 280;
+  const left = compact ? 48 : 64;
+  const right = compact ? 14 : 24;
+  const top = compact ? 16 : 20;
+  const bottom = compact ? 32 : 40;
   const plotW = width - left - right;
   const plotH = height - top - bottom;
-  const fontAxis = 15;
+  const fontAxis = compact ? 12 : 15;
+  const strokeW = compact ? 2.5 : 3;
+  const dotR = compact ? 4 : 5.5;
 
   function yFor(value: number): number {
     return top + plotH - ((value - yMin) / range) * plotH;
@@ -83,7 +92,7 @@ export function CumulativeLoadChart({
   const first = points[0];
   const last = points[points.length - 1];
   const area = `${first.x},${top + plotH} ${polyline} ${last.x},${top + plotH}`;
-  const ticks = loadTicks(Math.round(yMin), Math.round(yMax));
+  const ticks = loadTicks(Math.round(yMin), Math.round(yMax), compact);
 
   return (
     <div className="w-full min-w-0">
@@ -124,7 +133,7 @@ export function CumulativeLoadChart({
           points={polyline}
           fill="none"
           stroke="var(--ga-blue)"
-          strokeWidth={3}
+          strokeWidth={strokeW}
           strokeLinejoin="round"
           strokeLinecap="round"
         />
@@ -133,7 +142,7 @@ export function CumulativeLoadChart({
             key={point.point.id}
             cx={point.x}
             cy={point.y}
-            r={5.5}
+            r={dotR}
             fill="var(--ga-blue)"
           />
         ))}

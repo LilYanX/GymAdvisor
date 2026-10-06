@@ -8,6 +8,10 @@ import {
 } from "@/lib/actions/athlete-profile";
 import type { Athlete, AthleteBodyLog } from "@/lib/supabase/models";
 import { todayISO } from "@/lib/dates";
+import {
+  CumulativeLoadChart,
+  type CumulativeLoadSession,
+} from "@/components/athlete/CumulativeLoadChart";
 import { WeightChart } from "@/components/athlete/WeightChart";
 import { useLoadingActive } from "@/components/layout/LoadingProvider";
 
@@ -17,9 +21,11 @@ const weightInitial: AthleteProfileFormState = { error: null };
 export function AthleteProfileEditor({
   athlete,
   bodyLogs,
+  loadSessions = [],
 }: {
   athlete: Athlete;
   bodyLogs: AthleteBodyLog[];
+  loadSessions?: CumulativeLoadSession[];
 }) {
   const [profileState, profileAction, profilePending] = useActionState(
     updateAthleteSelfProfile,
@@ -150,6 +156,15 @@ export function AthleteProfileEditor({
             ) : null}
           </form>
           <WeightChart logs={bodyLogs} compact />
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-ga-border bg-ga-card">
+        <div className="border-b border-ga-border px-4 py-3">
+          <h2 className="text-sm font-semibold">Charges cumulées</h2>
+        </div>
+        <div className="p-4">
+          <CumulativeLoadChart sessions={loadSessions} compact />
         </div>
       </section>
     </div>
