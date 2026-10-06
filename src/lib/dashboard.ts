@@ -5,6 +5,7 @@ import {
   firstOfMonthISO,
   formatDayMonth,
   formatWeekdayLong,
+  parisDateISO,
   todayISO,
 } from "@/lib/dates";
 import type {
@@ -347,8 +348,14 @@ function lastCompletedDate(
   );
   const dates: string[] = [];
   for (const log of completed) {
+    if (log.started_at) {
+      const local = parisDateISO(log.started_at);
+      if (local) dates.push(local);
+      continue;
+    }
     if (log.completed_at) {
-      dates.push(log.completed_at.slice(0, 10));
+      const local = parisDateISO(log.completed_at);
+      if (local) dates.push(local);
       continue;
     }
     const session = sessions.find((item) => item.id === log.session_id);

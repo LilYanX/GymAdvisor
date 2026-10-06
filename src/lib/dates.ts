@@ -6,6 +6,36 @@ export function todayISO(): string {
   );
 }
 
+/** Date calendaire (YYYY-MM-DD) d’un timestamp ISO, fuseau Europe/Paris. */
+export function parisDateISO(isoTimestamp: string): string | null {
+  const date = new Date(isoTimestamp);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: PARIS }).format(date);
+}
+
+/**
+ * Date de réalisation d’une séance : jour du début (entraînement),
+ * sinon fin, sinon date planifiée.
+ */
+export function sessionPerformedDate(
+  log:
+    | {
+        started_at?: string | null;
+        completed_at?: string | null;
+      }
+    | null
+    | undefined,
+  scheduledDate: string | null | undefined,
+): string | null {
+  const fromStarted = log?.started_at ? parisDateISO(log.started_at) : null;
+  if (fromStarted) return fromStarted;
+  const fromCompleted = log?.completed_at
+    ? parisDateISO(log.completed_at)
+    : null;
+  if (fromCompleted) return fromCompleted;
+  return scheduledDate ?? null;
+}
+
 export function firstOfMonthISO(): string {
   return `${todayISO().slice(0, 7)}-01`;
 }

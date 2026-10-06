@@ -1,6 +1,8 @@
 import { requireCoach } from "@/lib/auth";
+import { bestEstimatedOneRm } from "@/lib/one-rm-formula";
 import { createClient } from "@/lib/supabase/server";
 import type { EditorData, EditorOverviewAthlete, EditorWeek } from "@/lib/editor-types";
+import type { Exercise, SessionExercise, SetLog } from "@/lib/supabase/models";
 
 export type {
   EditorData,
@@ -75,14 +77,60 @@ export async function getEditorData(
     last_name,
   }));
 
-  const [{ data: exercises }, { data: weeks }] = await Promise.all([
-    supabase.from("exercises").select("*").order("name"),
-    supabase
-      .from("program_weeks")
-      .select("week_number")
-      .eq("athlete_id", athleteFull.id)
-      .order("week_number"),
-  ]);
+  const [{ data: exercises }, { data: weeks }, { data: athleteSetLogs }] =
+    await Promise.all([
+      supabase.from("exercises").select("*").order("name"),
+      supabase
+        .from("program_weeks")
+        .select("week_number")
+        .eq("athlete_id", athleteFull.id)
+        .order("week_number"),
+      supabase
+        .from("set_logs")
+        .select("weight_kg, reps, completed, session_exercise_id")
+        .eq("athlete_id", athleteFull.id)
+        .eq("completed", true),
+    ]);
+
+  const setLogRows = (athleteSetLogs ?? []) as Pick<
+    SetLog,
+    "weight_kg" | "reps" | "completed" | "session_exercise_id"
+  >[];
+  const seIdsForOneRm = [
+    ...new Set(setLogRows.map((set) => set.session_exercise_id)),
+  ];
+  const { data: seForOneRm } = seIdsForOneRm.length
+    ? await supabase
+        .from("session_exercises")
+        .select("id, exercise_id")
+        .in("id", seIdsForOneRm)
+    : { data: [] as Pick<SessionExercise, "id" | "exercise_id">[] };
+
+  const exerciseIdBySe = new Map(
+    ((seForOneRm ?? []) as Pick<SessionExercise, "id" | "exercise_id">[]).map(
+      (row) => [row.id, row.exercise_id],
+    ),
+  );
+  const exerciseByIdForOneRm = new Map(
+    ((exercises ?? []) as Exercise[]).map((item) => [item.id, item]),
+  );
+  const setsByExerciseId = new Map<
+    string,
+    Array<{ weight_kg: number | null; reps: number | null }>
+  >();
+  for (const set of setLogRows) {
+    const exerciseId = exerciseIdBySe.get(set.session_exercise_id);
+    if (!exerciseId) continue;
+    const list = setsByExerciseId.get(exerciseId) ?? [];
+    list.push({ weight_kg: set.weight_kg, reps: set.reps });
+    setsByExerciseId.set(exerciseId, list);
+  }
+  const estimatedOneRmByExerciseId: Record<string, number> = {};
+  for (const [exerciseId, sets] of setsByExerciseId) {
+    const formula = exerciseByIdForOneRm.get(exerciseId)?.one_rm_formula;
+    const best = bestEstimatedOneRm(formula, sets);
+    if (best != null) estimatedOneRmByExerciseId[exerciseId] = best;
+  }
 
   const availableWeeks = (weeks ?? []).map((week) => week.week_number);
   const maxWeek = availableWeeks.length > 0 ? Math.max(...availableWeeks) : 0;
@@ -141,6 +189,7 @@ export async function getEditorData(
       athlete: athleteFull,
       athletes: list,
       exercises: exercises ?? [],
+      estimatedOneRmByExerciseId,
       week,
       weekNumber,
       availableWeeks,

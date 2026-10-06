@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import {
   addDaysISO,
   mondayOfWeekISO,
+  parisDateISO,
+  sessionPerformedDate,
   todayISO,
 } from "@/lib/dates";
 import {
@@ -345,12 +347,16 @@ export async function computeAthleteDashboard(
       sessionIdsForDates.length
         ? supabase
             .from("sessions")
-            .select("id, title, scheduled_date, estimated_minutes")
+            .select("id, title, scheduled_date, estimated_minutes, session_type")
             .in("id", sessionIdsForDates)
         : Promise.resolve({
             data: [] as Pick<
               Session,
-              "id" | "title" | "scheduled_date" | "estimated_minutes"
+              | "id"
+              | "title"
+              | "scheduled_date"
+              | "estimated_minutes"
+              | "session_type"
             >[],
           }),
     ]);
@@ -367,12 +373,16 @@ export async function computeAthleteDashboard(
       sessionIds.length
         ? supabase
             .from("sessions")
-            .select("id, title, scheduled_date, estimated_minutes")
+            .select("id, title, scheduled_date, estimated_minutes, session_type")
             .in("id", sessionIds)
         : Promise.resolve({
             data: [] as Pick<
               Session,
-              "id" | "title" | "scheduled_date" | "estimated_minutes"
+              | "id"
+              | "title"
+              | "scheduled_date"
+              | "estimated_minutes"
+              | "session_type"
             >[],
           }),
       seIds.length
@@ -392,23 +402,35 @@ export async function computeAthleteDashboard(
     {
       title: string;
       date: string | null;
+      scheduledDate: string | null;
       estimatedMinutes: number | null;
+      sessionType: Session["session_type"];
     }
   >();
   for (const session of [
     ...((sessions ?? []) as Pick<
       Session,
-      "id" | "title" | "scheduled_date" | "estimated_minutes"
+      | "id"
+      | "title"
+      | "scheduled_date"
+      | "estimated_minutes"
+      | "session_type"
     >[]),
     ...((datedSessions ?? []) as Pick<
       Session,
-      "id" | "title" | "scheduled_date" | "estimated_minutes"
+      | "id"
+      | "title"
+      | "scheduled_date"
+      | "estimated_minutes"
+      | "session_type"
     >[]),
   ]) {
     sessionMetaById.set(session.id, {
       title: session.title,
       date: session.scheduled_date,
+      scheduledDate: session.scheduled_date,
       estimatedMinutes: session.estimated_minutes,
+      sessionType: session.session_type,
     });
   }
   const seById = new Map(seRows.map((item) => [item.id, item]));
@@ -419,6 +441,17 @@ export async function computeAthleteDashboard(
     ]),
   );
   const logBySession = new Map(logRows.map((log) => [log.session_id, log]));
+
+  // Les métriques suivent la date de réalisation (début/fin), pas le jour planifié.
+  for (const [sessionId, meta] of sessionMetaById) {
+    const performed = sessionPerformedDate(
+      logBySession.get(sessionId),
+      meta.date,
+    );
+    if (performed) {
+      sessionMetaById.set(sessionId, { ...meta, date: performed });
+    }
+  }
 
   const feelingBuckets = new Map<
     string,
@@ -459,6 +492,7 @@ export async function computeAthleteDashboard(
   for (const row of checkInRows) {
     const date =
       (row.session_id ? sessionMetaById.get(row.session_id)?.date : null) ??
+      parisDateISO(row.created_at) ??
       row.created_at.slice(0, 10);
     if (date < from || date > to) continue;
     const scores: McLeanScores = {
@@ -705,15 +739,19 @@ export async function computeAthleteDashboard(
     }))
     .sort((a, b) => b.tonnageKg - a.tonnageKg);
 
-  const completedIds = new Set(
-    logRows
-      .filter((log) => log.status === "completed")
-      .map((log) => log.session_id),
-  );
   const sessionsPlanned = plannedSessions.length;
-  const sessionsCompleted = plannedSessions.filter((session) =>
-    completedIds.has(session.id),
-  ).length;
+  // Réalisées = séances terminées/sautées dont la date de réalisation
+  // (début) tombe dans la période — pas la date planifiée.
+  const sessionsCompleted = logRows.filter((log) => {
+    if (log.status !== "completed" && log.status !== "skipped") return false;
+    const meta = sessionMetaById.get(log.session_id);
+    if (!meta) return false;
+    if (meta.sessionType !== "workout" && meta.sessionType !== "optional") {
+      return false;
+    }
+    const date = meta.date;
+    return Boolean(date && date >= from && date <= to);
+  }).length;
 
   const periodFinalRpes = periodSessions
     .map((session) => session.finalRpe)

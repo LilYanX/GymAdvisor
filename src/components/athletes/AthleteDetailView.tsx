@@ -14,15 +14,16 @@ import type { AthleteFollowUp } from "@/lib/athlete-followup-types";
 import type { AthleteDashboardBundle } from "@/lib/dashboard-metrics";
 import type { AthleteBodyLog } from "@/lib/supabase/models";
 import { formatFeedbackDate } from "@/lib/dates";
-import { PAYMENT_DISPLAY_LABELS } from "@/lib/payments";
 import { AthleteMetricsDashboard } from "@/components/dashboard/AthleteMetricsDashboard";
+import { CumulativeLoadChart } from "@/components/athlete/CumulativeLoadChart";
 import { WeightChart } from "@/components/athlete/WeightChart";
 
-function monthLabel(): string {
-  return new Intl.DateTimeFormat("fr-FR", { month: "long" }).format(new Date());
-}
-
 const initial: AthleteFormState = { error: null };
+
+const fieldClassName =
+  "mt-1 w-full rounded-lg border border-ga-border bg-ga-elevated px-2.5 py-1.5 text-sm text-ga-fg outline-none focus:border-ga-lime";
+const readonlyFieldClassName =
+  "mt-1 rounded-lg border border-ga-border/60 bg-ga-elevated/50 px-2.5 py-1.5 text-sm text-ga-fg";
 
 export function AthleteDetailView({
   data,
@@ -53,12 +54,49 @@ export function AthleteDetailView({
             {athlete.first_name} {athlete.last_name}
           </h1>
         </div>
-        <Link
-          href={`/editeur?athlete=${athlete.id}`}
-          className="shrink-0 rounded-lg bg-ga-lime px-3 py-2 text-sm font-semibold text-black hover:bg-lime-300"
-        >
-          Éditeur
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              disabled={payPending}
+              onClick={() => {
+                setPayError(null);
+                startPay(async () => {
+                  const result = await setPaymentStatus(athlete.id, "paid");
+                  if (result.error) setPayError(result.error);
+                  else router.refresh();
+                });
+              }}
+              className="rounded-lg bg-ga-lime px-3 py-2 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
+            >
+              {data.paymentBlocked ? "Réactiver" : "Payé"}
+            </button>
+            <button
+              type="button"
+              disabled={payPending}
+              onClick={() => {
+                setPayError(null);
+                startPay(async () => {
+                  const result = await setPaymentStatus(athlete.id, "pending");
+                  if (result.error) setPayError(result.error);
+                  else router.refresh();
+                });
+              }}
+              className="rounded-lg border border-ga-border px-3 py-2 text-sm text-ga-muted hover:text-ga-fg disabled:opacity-60"
+            >
+              En attente
+            </button>
+          </div>
+          {payError ? (
+            <p className="w-full text-right text-[11px] text-ga-red">{payError}</p>
+          ) : null}
+          <Link
+            href={`/editeur?athlete=${athlete.id}`}
+            className="shrink-0 rounded-lg bg-ga-lime px-3 py-2 text-sm font-semibold text-black hover:bg-lime-300"
+          >
+            Éditeur
+          </Link>
+        </div>
       </div>
 
       <AthleteMetricsDashboard
@@ -68,17 +106,31 @@ export function AthleteDetailView({
         variant="coach"
       />
 
-      <section className="rounded-xl border border-ga-border bg-ga-card p-4 md:p-5">
-        <h2 className="text-lg font-semibold">Courbe de poids</h2>
-        <div className="mt-4">
-          <WeightChart logs={bodyLogs} />
-        </div>
-      </section>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-xl border border-ga-border bg-ga-card p-4 md:p-5">
+          <h2 className="text-lg font-semibold">Courbe de poids</h2>
+          <div className="mt-4">
+            <WeightChart logs={bodyLogs} />
+          </div>
+        </section>
+        <section className="rounded-xl border border-ga-border bg-ga-card p-4 md:p-5">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <h2 className="text-lg font-semibold">Charges cumulées</h2>
+            <p className="text-xs text-ga-muted">
+              UA final {data.totals.loadUnitsFinal.toLocaleString("fr-FR")} · UA
+              moy. {data.totals.loadUnits.toLocaleString("fr-FR")}
+            </p>
+          </div>
+          <div className="mt-4">
+            <CumulativeLoadChart sessions={data.sessions} />
+          </div>
+        </section>
+      </div>
 
-      <div className="grid items-stretch gap-4 xl:grid-cols-12">
+      <div className="grid items-stretch gap-4 xl:grid-cols-2">
         <form
           action={action}
-          className="grid h-full grid-cols-2 content-start gap-2.5 rounded-xl border border-ga-border bg-ga-card p-4 xl:col-span-5"
+          className="grid h-full grid-cols-2 content-start gap-2.5 rounded-xl border border-ga-border bg-ga-card p-4"
         >
           <h2 className="col-span-2 text-sm font-semibold">Informations</h2>
           <input type="hidden" name="athlete_id" value={athlete.id} />
@@ -88,7 +140,7 @@ export function AthleteDetailView({
               name="first_name"
               required
               defaultValue={athlete.first_name}
-              className="mt-1 w-full rounded-lg border border-ga-border bg-ga-elevated px-2.5 py-1.5 text-sm outline-none focus:border-ga-lime"
+              className={fieldClassName}
             />
           </label>
           <label className="text-xs text-ga-muted">
@@ -96,7 +148,7 @@ export function AthleteDetailView({
             <input
               name="last_name"
               defaultValue={athlete.last_name}
-              className="mt-1 w-full rounded-lg border border-ga-border bg-ga-elevated px-2.5 py-1.5 text-sm outline-none focus:border-ga-lime"
+              className={fieldClassName}
             />
           </label>
           <label className="col-span-2 text-xs text-ga-muted">
@@ -106,7 +158,7 @@ export function AthleteDetailView({
               type="email"
               required
               defaultValue={athlete.email}
-              className="mt-1 w-full rounded-lg border border-ga-border bg-ga-elevated px-2.5 py-1.5 text-sm outline-none focus:border-ga-lime"
+              className={fieldClassName}
             />
           </label>
           <label className="col-span-2 text-xs text-ga-muted">
@@ -114,12 +166,12 @@ export function AthleteDetailView({
             <input
               name="goal"
               defaultValue={athlete.goal}
-              className="mt-1 w-full rounded-lg border border-ga-border bg-ga-elevated px-2.5 py-1.5 text-sm outline-none focus:border-ga-lime"
+              className={fieldClassName}
             />
           </label>
           <div className="text-xs text-ga-muted">
             Taille
-            <p className="mt-1 rounded-lg border border-ga-border/60 bg-ga-elevated/50 px-2.5 py-1.5 text-sm text-ga-fg">
+            <p className={readonlyFieldClassName}>
               {athlete.height_cm != null
                 ? `${athlete.height_cm.toLocaleString("fr-FR")} cm`
                 : "—"}
@@ -127,7 +179,7 @@ export function AthleteDetailView({
           </div>
           <div className="text-xs text-ga-muted">
             Poids (dernier)
-            <p className="mt-1 rounded-lg border border-ga-border/60 bg-ga-elevated/50 px-2.5 py-1.5 text-sm text-ga-fg">
+            <p className={readonlyFieldClassName}>
               {bodyLogs.length > 0
                 ? `${bodyLogs[bodyLogs.length - 1].weight_kg.toLocaleString("fr-FR")} kg`
                 : "—"}
@@ -140,7 +192,7 @@ export function AthleteDetailView({
               type="number"
               min={1}
               defaultValue={athlete.current_week}
-              className="mt-1 w-full rounded-lg border border-ga-border bg-ga-elevated px-2.5 py-1.5 text-sm outline-none focus:border-ga-lime"
+              className={fieldClassName}
             />
           </label>
           <label className="text-xs text-ga-muted">
@@ -150,7 +202,7 @@ export function AthleteDetailView({
               type="number"
               min={1}
               defaultValue={athlete.total_weeks}
-              className="mt-1 w-full rounded-lg border border-ga-border bg-ga-elevated px-2.5 py-1.5 text-sm outline-none focus:border-ga-lime"
+              className={fieldClassName}
             />
           </label>
           <label className="col-span-2 text-xs text-ga-muted">
@@ -159,7 +211,7 @@ export function AthleteDetailView({
               name="notes"
               rows={2}
               defaultValue={athlete.notes}
-              className="mt-1 w-full rounded-lg border border-ga-border bg-ga-elevated px-2.5 py-1.5 text-sm outline-none focus:border-ga-lime"
+              className={fieldClassName}
             />
           </label>
           {state.error ? (
@@ -216,102 +268,7 @@ export function AthleteDetailView({
           </div>
         </form>
 
-        <div className="flex flex-col gap-4 xl:col-span-3">
-          <section className="rounded-xl border border-ga-border bg-ga-card p-4">
-            <h2 className="text-sm font-semibold">Paiement · {monthLabel()}</h2>
-            <p className="mt-2 text-sm">
-              <span
-                className={`font-semibold ${
-                  data.paymentDisplayStatus === "paid"
-                    ? "text-ga-lime"
-                    : data.paymentDisplayStatus === "late"
-                      ? "text-ga-amber"
-                      : data.paymentDisplayStatus === "blocked"
-                        ? "text-ga-red"
-                        : "text-ga-muted"
-                }`}
-              >
-                {PAYMENT_DISPLAY_LABELS[data.paymentDisplayStatus]}
-              </span>
-              {data.paymentBlocked ? (
-                <span className="ml-1 text-xs text-ga-red">(bloqué)</span>
-              ) : null}
-            </p>
-            {data.overdueMonthLabels.length > 0 ? (
-              <p className="mt-1 text-xs text-ga-red">
-                Impayés : {data.overdueMonthLabels.join(", ")}
-              </p>
-            ) : null}
-            {payError ? (
-              <p className="mt-1 text-xs text-ga-red">{payError}</p>
-            ) : null}
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={payPending}
-                onClick={() => {
-                  setPayError(null);
-                  startPay(async () => {
-                    const result = await setPaymentStatus(athlete.id, "paid");
-                    if (result.error) setPayError(result.error);
-                    else router.refresh();
-                  });
-                }}
-                className="rounded-lg bg-ga-lime px-2.5 py-1.5 text-xs font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
-              >
-                {data.paymentBlocked ? "Réactiver" : "Payé"}
-              </button>
-              <button
-                type="button"
-                disabled={payPending}
-                onClick={() => {
-                  setPayError(null);
-                  startPay(async () => {
-                    const result = await setPaymentStatus(athlete.id, "pending");
-                    if (result.error) setPayError(result.error);
-                    else router.refresh();
-                  });
-                }}
-                className="rounded-lg border border-ga-border px-2.5 py-1.5 text-xs text-ga-muted hover:text-ga-fg disabled:opacity-60"
-              >
-                En attente
-              </button>
-            </div>
-          </section>
-
-          <section className="rounded-xl border border-ga-border bg-ga-card p-4">
-            <h2 className="text-sm font-semibold">Charge cumulée</h2>
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <div className="rounded-lg bg-ga-elevated p-2.5">
-                <p className="text-[10px] uppercase tracking-wide text-ga-muted">
-                  Tonnage
-                </p>
-                <p className="mt-0.5 text-lg font-semibold">
-                  {data.totals.tonnageKg.toLocaleString("fr-FR")}
-                  <span className="text-xs font-normal text-ga-muted"> kg</span>
-                </p>
-              </div>
-              <div className="rounded-lg bg-ga-elevated p-2.5">
-                <p className="text-[10px] uppercase tracking-wide text-ga-muted">
-                  UA moy.
-                </p>
-                <p className="mt-0.5 text-lg font-semibold">
-                  {data.totals.loadUnits.toLocaleString("fr-FR")}
-                </p>
-              </div>
-              <div className="rounded-lg bg-ga-elevated p-2.5">
-                <p className="text-[10px] uppercase tracking-wide text-ga-muted">
-                  UA final
-                </p>
-                <p className="mt-0.5 text-lg font-semibold">
-                  {data.totals.loadUnitsFinal.toLocaleString("fr-FR")}
-                </p>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <section className="relative min-h-0 overflow-hidden rounded-xl border border-ga-border bg-ga-card p-4 xl:col-span-4">
+        <section className="relative min-h-0 overflow-hidden rounded-xl border border-ga-border bg-ga-card p-4">
           <h2 className="text-sm font-semibold">Retours récents</h2>
           {data.feedbacks.length === 0 ? (
             <p className="mt-2 text-sm text-ga-muted">Aucun feedback.</p>

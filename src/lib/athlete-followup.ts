@@ -1,5 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { firstOfMonthISO, todayISO, addDaysISO, formatPeriodLabel } from "@/lib/dates";
+import {
+  firstOfMonthISO,
+  todayISO,
+  addDaysISO,
+  formatPeriodLabel,
+  sessionPerformedDate,
+} from "@/lib/dates";
 import { syncAthleteCurrentWeek } from "@/lib/athlete-week-sync";
 import {
   getAthletePaymentState,
@@ -150,13 +156,20 @@ export async function getAthleteFollowUp(
     }
   }
 
+  const feelingSessionIds = [
+    ...new Set(feelings.map((feeling) => feeling.session_id)),
+  ];
+  const logSessionIds = [
+    ...new Set([...sessionIds, ...feelingSessionIds]),
+  ];
+
   const [{ data: logs }, { data: sessionExercises }] = await Promise.all([
-    sessionIds.length
+    logSessionIds.length
       ? supabase
           .from("session_logs")
           .select("*")
           .eq("athlete_id", athleteId)
-          .in("session_id", sessionIds)
+          .in("session_id", logSessionIds)
       : Promise.resolve({ data: [] as SessionLog[] }),
     sessionIds.length
       ? supabase
@@ -166,6 +179,18 @@ export async function getAthleteFollowUp(
           .order("sort_order")
       : Promise.resolve({ data: [] as SessionExercise[] }),
   ]);
+
+  const sessionLogBySession = new Map(
+    ((logs ?? []) as SessionLog[]).map((log) => [log.session_id, log]),
+  );
+
+  for (const feeling of feelings) {
+    const session = sessionById.get(feeling.session_id);
+    feeling.sessionDate = sessionPerformedDate(
+      sessionLogBySession.get(feeling.session_id),
+      session?.scheduled_date ?? feeling.sessionDate,
+    );
+  }
 
   const seIds = (sessionExercises ?? []).map((item) => item.id);
   const exerciseIds = [
@@ -208,14 +233,16 @@ export async function getAthleteFollowUp(
       log,
     ]),
   );
-  const sessionLogBySession = new Map(
-    ((logs ?? []) as SessionLog[]).map((log) => [log.session_id, log]),
-  );
 
   const feedbacks: FeedbackItem[] = [];
   const tonnageSessions: TonnageSession[] = [];
 
   for (const session of sessions) {
+    const sessionLog = sessionLogBySession.get(session.id);
+    const performedDate = sessionPerformedDate(
+      sessionLog,
+      session.scheduled_date,
+    );
     const ses = ((sessionExercises ?? []) as SessionExercise[]).filter(
       (item) => item.session_id === session.id,
     );
@@ -249,7 +276,7 @@ export async function getAthleteFollowUp(
         feedbacks.push({
           sessionId: session.id,
           sessionTitle: session.title,
-          sessionDate: session.scheduled_date,
+          sessionDate: performedDate,
           exerciseName: exercise?.name ?? "Exercice",
           rpe: elog.rpe,
           comment: elog.comment,
@@ -259,7 +286,6 @@ export async function getAthleteFollowUp(
 
     const avgRpe =
       rpes.length > 0 ? rpes.reduce((a, b) => a + b, 0) / rpes.length : 0;
-    const sessionLog = sessionLogBySession.get(session.id);
     const actualMinutes = sessionDurationMinutes(
       sessionLog?.started_at,
       sessionLog?.completed_at,
@@ -283,7 +309,7 @@ export async function getAthleteFollowUp(
       tonnageSessions.push({
         sessionId: session.id,
         title: session.title,
-        date: session.scheduled_date,
+        date: performedDate,
         tonnageKg: Math.round(sessionTonnage),
         loadUnits,
         loadUnitsFinal,

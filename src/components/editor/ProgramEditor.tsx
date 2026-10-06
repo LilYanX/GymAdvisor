@@ -33,6 +33,10 @@ import {
   weekdayLabel,
 } from "@/lib/labels";
 import type { SessionType, TargetUnit } from "@/lib/supabase/models";
+import {
+  percentOfOneRm,
+  weightFromPercentOneRm,
+} from "@/lib/one-rm-formula";
 import { IconCopy, IconPlus, IconTrash } from "@/components/icons";
 import { ExerciseMedia } from "@/components/media/ExerciseMedia";
 import { useLoading } from "@/components/layout/LoadingProvider";
@@ -125,9 +129,9 @@ function patchSessionInWeek(
 }
 
 function editorWeekStatusLabel(week: EditorWeek, dirty: boolean): string {
-  if (dirty) return "Brouillon";
-  if (week.status === "published") return "À jour";
-  return "Non publiée";
+  if (dirty) return "Modifications non enregistrées";
+  if (week.status === "published") return "Publiée · visible sportif";
+  return "Brouillon enregistré · non visible sportif";
 }
 
 export function ProgramEditor({
@@ -141,6 +145,7 @@ export function ProgramEditor({
   const { setLoading } = useLoading();
   const [creatingWeek, startCreateWeek] = useTransition();
   const [publishing, setPublishing] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     data.week?.sessions[0]?.id ?? null,
@@ -213,6 +218,35 @@ export function ProgramEditor({
     setDraftWeek(nextWeek);
     setDirty(true);
     setError(null);
+  }
+
+  function saveDraft() {
+    const currentWeek = draftWeek ?? week;
+    if (!currentWeek) return;
+
+    setError(null);
+    setSavingDraft(true);
+    setLoading(true);
+    void (async () => {
+      try {
+        const synced = await syncWeekDraft(
+          currentWeek.id,
+          serializeWeekForSync(currentWeek),
+        );
+        if (synced.error) {
+          setError(synced.error);
+          return;
+        }
+        setDirty(false);
+        setDraftWeek((current) =>
+          current ? { ...current, status: "draft" } : current,
+        );
+        router.refresh();
+      } finally {
+        setSavingDraft(false);
+        setLoading(false);
+      }
+    })();
   }
 
   function publish() {
@@ -715,6 +749,10 @@ export function ProgramEditor({
                               <ExerciseBlock
                                 key={item.id}
                                 item={item}
+                                estimatedOneRm={
+                                  data.estimatedOneRmByExerciseId[item.exercise_id] ??
+                                  null
+                                }
                                 expanded={expandedId === item.id}
                                 pending={publishing}
                                 inSuperset
@@ -758,6 +796,11 @@ export function ProgramEditor({
                       ) : (
                         <ExerciseBlock
                           item={group.item}
+                          estimatedOneRm={
+                            data.estimatedOneRmByExerciseId[
+                              group.item.exercise_id
+                            ] ?? null
+                          }
                           expanded={expandedId === group.item.id}
                           pending={publishing}
                           inSuperset={false}
@@ -934,16 +977,27 @@ export function ProgramEditor({
               ) : (
                 editorWeekStatusLabel(editorWeek, dirty)
               )}
+              {savingDraft ? " · Enregistrement…" : ""}
               {publishing ? " · Publication…" : ""}
             </p>
-            <button
-              type="button"
-              disabled={publishing}
-              onClick={publish}
-              className="rounded-lg bg-ga-lime px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
-            >
-              Publier la semaine
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={publishing || savingDraft || !dirty}
+                onClick={saveDraft}
+                className="rounded-lg border border-ga-border px-4 py-2 text-sm font-medium text-ga-fg hover:bg-ga-elevated disabled:opacity-60"
+              >
+                Enregistrer le brouillon
+              </button>
+              <button
+                type="button"
+                disabled={publishing || savingDraft}
+                onClick={publish}
+                className="rounded-lg bg-ga-lime px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
+              >
+                Publier la semaine
+              </button>
+            </div>
           </div>
         </footer>
       ) : null}
@@ -976,6 +1030,7 @@ function DropZone({
 
 function ExerciseBlock({
   item,
+  estimatedOneRm,
   expanded,
   pending,
   inSuperset,
@@ -990,6 +1045,7 @@ function ExerciseBlock({
   onUnlinkSuperset,
 }: {
   item: EditorSessionExercise;
+  estimatedOneRm: number | null;
   expanded: boolean;
   pending: boolean;
   inSuperset: boolean;
@@ -1020,6 +1076,24 @@ function ExerciseBlock({
     .join(" · ");
 
   const unit = item.target_unit ?? "reps";
+
+  function saveWeight(value: number | null) {
+    const patch: Partial<EditorSessionExercise> = { target_weight_kg: value };
+    if (value != null && estimatedOneRm != null) {
+      const percent = percentOfOneRm(value, estimatedOneRm);
+      if (percent != null) patch.target_percent = percent;
+    }
+    onSave(patch);
+  }
+
+  function savePercent(value: number | null) {
+    const patch: Partial<EditorSessionExercise> = { target_percent: value };
+    if (value != null && estimatedOneRm != null) {
+      const weight = weightFromPercentOneRm(value, estimatedOneRm);
+      if (weight != null) patch.target_weight_kg = weight;
+    }
+    onSave(patch);
+  }
 
   return (
     <article
@@ -1117,14 +1191,25 @@ function ExerciseBlock({
             label="Charge (kg)"
             value={item.target_weight_kg}
             disabled={pending}
-            onChange={(value) => onSave({ target_weight_kg: value })}
+            onChange={saveWeight}
           />
           <NumberField
             label="% 1RM"
             value={item.target_percent}
             disabled={pending}
-            onChange={(value) => onSave({ target_percent: value })}
+            onChange={savePercent}
           />
+          {estimatedOneRm != null ? (
+            <p className="col-span-2 text-[11px] text-ga-muted">
+              1RM estimée sportif :{" "}
+              <span className="font-medium text-ga-fg">{estimatedOneRm} kg</span>
+              {" · "}remplir charge ou % pour calculer l’autre
+            </p>
+          ) : item.exercise?.one_rm_formula ? (
+            <p className="col-span-2 text-[11px] text-ga-muted">
+              % 1RM calculable après au moins une charge loggée sur cet exercice
+            </p>
+          ) : null}
           <NumberField
             label="RPE cible"
             value={item.target_rpe}

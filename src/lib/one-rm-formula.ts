@@ -153,6 +153,43 @@ export function pickSetForOneRm(
   return null;
 }
 
+/** % de 1RM pour une charge donnée (1 décimale). */
+export function percentOfOneRm(
+  weightKg: number,
+  oneRmKg: number,
+): number | null {
+  if (!(weightKg > 0) || !(oneRmKg > 0)) return null;
+  return Math.round((weightKg / oneRmKg) * 1000) / 10;
+}
+
+/** Charge cible depuis un % 1RM (arrondi au 0,5 kg). */
+export function weightFromPercentOneRm(
+  percent: number,
+  oneRmKg: number,
+): number | null {
+  if (!(percent > 0) || !(oneRmKg > 0)) return null;
+  return Math.round((oneRmKg * percent) / 100 / 0.5) * 0.5;
+}
+
+/** Meilleure 1RM estimée parmi des séries (max). */
+export function bestEstimatedOneRm(
+  formula: string | null | undefined,
+  sets: Array<{ weight_kg: number | null; reps: number | null }>,
+): number | null {
+  let best: number | null = null;
+  for (const set of sets) {
+    if (set.weight_kg == null || set.reps == null) continue;
+    const estimated = evaluateOneRmFormula(formula, {
+      weight: set.weight_kg,
+      reps: set.reps,
+    });
+    if (estimated != null && (best == null || estimated > best)) {
+      best = estimated;
+    }
+  }
+  return best;
+}
+
 function evaluateTokens(tokens: Token[], vars: OneRmVariables): number {
   let pos = 0;
 

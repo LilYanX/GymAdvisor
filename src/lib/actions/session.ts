@@ -7,6 +7,7 @@ import {
   assertEndAfterStart,
   parseDatetimeLocal,
 } from "@/lib/session-timing";
+import { maybeAutoPublishNextDraftWeek } from "@/lib/actions/program";
 import { createClient } from "@/lib/supabase/server";
 
 function refresh() {
@@ -236,6 +237,7 @@ export async function completeSession(
     .eq("session_id", sessionId)
     .eq("athlete_id", owned.athlete.id);
   if (error) return { error: error.message };
+  await maybeAutoPublishNextDraftWeek(owned.athlete.id, sessionId);
   refresh();
   return { error: null };
 }
@@ -281,6 +283,7 @@ export async function skipSession(sessionId: string) {
     { onConflict: "session_id" },
   );
   if (error) return { error: error.message };
+  await maybeAutoPublishNextDraftWeek(owned.athlete.id, sessionId);
   refresh();
   return { error: null };
 }

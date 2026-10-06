@@ -20,6 +20,7 @@ import { formatPrescriptionQuantity } from "@/lib/labels";
 import { toDatetimeLocalValue } from "@/lib/session-timing";
 import {
   evaluateOneRmFormula,
+  percentOfOneRm,
   pickSetForOneRm,
 } from "@/lib/one-rm-formula";
 
@@ -93,6 +94,10 @@ function ExercisePanel({
     oneRmPick && item.exercise?.one_rm_formula
       ? evaluateOneRmFormula(item.exercise.one_rm_formula, oneRmPick)
       : null;
+  const percentOneRm =
+    oneRmPick && estimatedOneRm != null
+      ? percentOfOneRm(oneRmPick.weight, estimatedOneRm)
+      : null;
 
   function updateSet(
     setNumber: number,
@@ -137,6 +142,12 @@ function ExercisePanel({
         <p className="mt-1 text-sm text-ga-muted">
           1RM estimée :{" "}
           <span className="font-medium text-ga-fg">{estimatedOneRm} kg</span>
+          {percentOneRm != null ? (
+            <>
+              {" · "}
+              <span className="font-medium text-ga-fg">{percentOneRm}%</span> 1RM
+            </>
+          ) : null}
         </p>
       ) : null}
       {item.exercise?.cues && item.exercise.cues.length > 0 ? (

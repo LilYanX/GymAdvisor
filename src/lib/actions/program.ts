@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireCoach } from "@/lib/auth";
 import { addDaysISO, mondayOfWeekISO } from "@/lib/dates";
 import { isLocalId, sanitizeRestSeconds, type WeekSyncPayload } from "@/lib/editor-draft";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { SessionType } from "@/lib/supabase/models";
 
@@ -862,17 +863,41 @@ export async function publishWeek(weekId: string) {
     return { error: athleteResult.error ?? "Sportif introuvable." };
   }
 
+  const result = await publishWeekCore(
+    supabase,
+    week,
+    athleteResult.athlete.current_week,
+  );
+  if (result.error) return result;
+
+  void owned;
+  revalidateEditor();
+  return { error: null };
+}
+
+async function publishWeekCore(
+  // Client utilisateur (coach) ou admin (auto-publish sportif).
+  supabase: {
+    from: Awaited<ReturnType<typeof createClient>>["from"];
+  },
+  week: {
+    id: string;
+    athlete_id: string;
+    week_number: number;
+  },
+  athleteCurrentWeek: number,
+) {
   const { data: sessions } = await supabase
     .from("sessions")
     .select("*")
-    .eq("program_week_id", weekId);
+    .eq("program_week_id", week.id);
 
   if (!sessions || sessions.length === 0) {
     return { error: "Ajoute au moins un jour avant de publier." };
   }
 
   const monday = mondayOfWeekISO();
-  const offsetWeeks = week.week_number - athleteResult.athlete.current_week;
+  const offsetWeeks = week.week_number - athleteCurrentWeek;
   const weekMonday = addDaysISO(monday, offsetWeeks * 7);
 
   for (const session of sessions) {
@@ -886,17 +911,120 @@ export async function publishWeek(weekId: string) {
   const { error: weekError } = await supabase
     .from("program_weeks")
     .update({ status: "published", published_at: new Date().toISOString() })
-    .eq("id", weekId);
+    .eq("id", week.id);
   if (weekError) return { error: weekError.message };
 
   await supabase.from("reminder_logs").insert({
     athlete_id: week.athlete_id,
     kind: "week_prepare",
     channel: "email",
-    program_week_id: weekId,
+    program_week_id: week.id,
   });
 
-  void owned;
-  revalidateEditor();
   return { error: null };
+}
+
+/**
+ * Si toutes les séances workout/optional de la semaine courante sont
+ * terminées (ou sautées) et qu’un brouillon de la semaine suivante existe,
+ * le publie automatiquement.
+ * Utilise le client admin car le sportif n’a pas le droit d’écrire sur
+ * program_weeks / sessions (RLS coach-only).
+ */
+export async function maybeAutoPublishNextDraftWeek(
+  athleteId: string,
+  completedSessionId: string,
+) {
+  const supabase = await createClient();
+
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("id, program_week_id, session_type")
+    .eq("id", completedSessionId)
+    .maybeSingle();
+  if (!session?.program_week_id) return { published: false };
+
+  // Le sportif ne voit que les semaines publiées : OK pour la semaine en cours.
+  const { data: currentWeek } = await supabase
+    .from("program_weeks")
+    .select("id, athlete_id, week_number, status")
+    .eq("id", session.program_week_id)
+    .maybeSingle();
+  if (
+    !currentWeek ||
+    currentWeek.athlete_id !== athleteId ||
+    currentWeek.status !== "published"
+  ) {
+    return { published: false };
+  }
+
+  const { data: weekSessions } = await supabase
+    .from("sessions")
+    .select("id, session_type")
+    .eq("program_week_id", currentWeek.id);
+
+  const trackable = (weekSessions ?? []).filter(
+    (item) => item.session_type === "workout" || item.session_type === "optional",
+  );
+  if (trackable.length === 0) return { published: false };
+
+  const trackableIds = trackable.map((item) => item.id);
+  const { data: logs } = await supabase
+    .from("session_logs")
+    .select("session_id, status")
+    .eq("athlete_id", athleteId)
+    .in("session_id", trackableIds);
+
+  const doneBySession = new Map(
+    (logs ?? []).map((log) => [log.session_id, log.status]),
+  );
+  const allDone = trackableIds.every((id) => {
+    const status = doneBySession.get(id);
+    return status === "completed" || status === "skipped";
+  });
+  if (!allDone) return { published: false };
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { published: false, error: "Service role indisponible." };
+  }
+
+  const nextWeekNumber = currentWeek.week_number + 1;
+  const { data: nextDraft } = await admin
+    .from("program_weeks")
+    .select("id, athlete_id, week_number, status")
+    .eq("athlete_id", athleteId)
+    .eq("week_number", nextWeekNumber)
+    .eq("status", "draft")
+    .maybeSingle();
+  if (!nextDraft) return { published: false };
+
+  const { data: athlete } = await admin
+    .from("athletes")
+    .select("current_week, total_weeks")
+    .eq("id", athleteId)
+    .maybeSingle();
+  if (!athlete) return { published: false };
+
+  const result = await publishWeekCore(
+    admin,
+    nextDraft,
+    athlete.current_week,
+  );
+  if (result.error) return { published: false, error: result.error };
+
+  const nextCurrent = Math.min(nextWeekNumber, athlete.total_weeks);
+  if (nextCurrent !== athlete.current_week) {
+    await admin
+      .from("athletes")
+      .update({ current_week: nextCurrent })
+      .eq("id", athleteId);
+  }
+
+  revalidateEditor();
+  revalidatePath("/app");
+  revalidatePath("/app/programme");
+  return { published: true };
 }

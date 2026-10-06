@@ -29,6 +29,8 @@ export type EditorData = {
   athlete: Athlete;
   athletes: Pick<Athlete, "id" | "first_name" | "last_name">[];
   exercises: Exercise[];
+  /** Meilleure 1RM estimée par exercice (depuis les charges loggées). */
+  estimatedOneRmByExerciseId: Record<string, number>;
   week: EditorWeek | null;
   weekNumber: number;
   availableWeeks: number[];
