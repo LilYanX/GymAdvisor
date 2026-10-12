@@ -930,7 +930,8 @@ export type Database = {
         | "cardio"
         | "mobilite"
         | "balistique"
-        | "pliometrie";
+        | "pliometrie"
+        | "etirement";
       week_status: "draft" | "published";
       session_type: "workout" | "rest" | "optional";
       session_log_status: "not_started" | "in_progress" | "completed" | "skipped";
@@ -938,7 +939,7 @@ export type Database = {
       reminder_kind: "session_fill" | "week_prepare" | "payment" | "check_in";
       reminder_channel: "email";
       workout_template_kind: "day" | "block";
-      target_unit: "reps" | "meters" | "seconds";
+      target_unit: "reps" | "meters" | "seconds" | "minutes" | "respirations";
     };
     CompositeTypes: {
       [_ in never]: never;

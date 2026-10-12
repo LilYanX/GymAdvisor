@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AthleteExercise, AthleteSessionView } from "@/lib/athlete-types";
 import {
@@ -23,6 +23,8 @@ import {
   percentOfOneRm,
   pickSetForOneRm,
 } from "@/lib/one-rm-formula";
+
+const DENSE_STORAGE_KEY = "ga.workout.dense";
 
 type SetDraft = {
   set_number: number;
@@ -79,12 +81,14 @@ function ExercisePanel({
   draft,
   onDraftChange,
   compact,
+  dense,
   disabled,
 }: {
   item: AthleteExercise;
   draft: ExerciseDraft;
   onDraftChange: (draft: ExerciseDraft) => void;
   compact?: boolean;
+  dense?: boolean;
   disabled: boolean;
 }) {
   const videoUrl = item.exercise?.video_url;
@@ -127,7 +131,9 @@ function ExercisePanel({
         />
       </div>
 
-      <h2 className={`font-semibold ${compact ? "mt-3 text-lg" : "mt-5 text-2xl"}`}>
+      <h2
+        className={`font-semibold ${compact ? "mt-3 text-lg" : "mt-5 text-2xl"}`}
+      >
         {item.exercise?.name ?? "Exercice"}
       </h2>
       <p
@@ -135,11 +141,13 @@ function ExercisePanel({
       >
         {prescriptionMain(item)}
       </p>
-      {details ? (
-        <p className="mt-1 text-sm text-ga-muted">{details}</p>
+      {details && !dense ? (
+        <p className={`mt-1 text-ga-muted ${compact ? "text-xs" : "text-sm"}`}>
+          {details}
+        </p>
       ) : null}
-      {estimatedOneRm != null ? (
-        <p className="mt-1 text-sm text-ga-muted">
+      {estimatedOneRm != null && !dense ? (
+        <p className={`mt-1 text-ga-muted ${compact ? "text-xs" : "text-sm"}`}>
           1RM estimée :{" "}
           <span className="font-medium text-ga-fg">{estimatedOneRm} kg</span>
           {percentOneRm != null ? (
@@ -150,8 +158,12 @@ function ExercisePanel({
           ) : null}
         </p>
       ) : null}
-      {item.exercise?.cues && item.exercise.cues.length > 0 ? (
-        <ol className="mt-3 list-decimal space-y-1.5 pl-4 text-sm text-ga-muted">
+      {item.exercise?.cues && item.exercise.cues.length > 0 && !dense ? (
+        <ol
+          className={`mt-3 list-decimal space-y-1.5 pl-4 text-ga-muted ${
+            compact ? "text-xs" : "text-sm"
+          }`}
+        >
           {item.exercise.cues.slice(0, 6).map((cue) => (
             <li key={cue}>{cue}</li>
           ))}
@@ -257,11 +269,13 @@ function GroupContent({
   group,
   drafts,
   onDraftChange,
+  dense,
   disabled,
 }: {
   group: WorkoutGroup;
   drafts: Record<string, ExerciseDraft>;
   onDraftChange: (exerciseId: string, draft: ExerciseDraft) => void;
+  dense: boolean;
   disabled: boolean;
 }) {
   if (group.kind === "single") {
@@ -270,6 +284,7 @@ function GroupContent({
         item={group.item}
         draft={drafts[group.item.id]}
         onDraftChange={(draft) => onDraftChange(group.item.id, draft)}
+        dense={dense}
         disabled={disabled}
       />
     );
@@ -284,6 +299,7 @@ function GroupContent({
           draft={drafts[item.id]}
           onDraftChange={(draft) => onDraftChange(item.id, draft)}
           compact
+          dense={dense}
           disabled={disabled}
         />
       ))}
@@ -313,6 +329,27 @@ export function SessionWorkout({
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [endedAt, setEndedAt] = useState(toDatetimeLocalValue);
   const [finalRpe, setFinalRpe] = useState<number | null>(null);
+  const [dense, setDense] = useState(false);
+
+  useEffect(() => {
+    try {
+      setDense(window.localStorage.getItem(DENSE_STORAGE_KEY) === "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function toggleDense() {
+    setDense((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(DENSE_STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
 
   const group = groups[index];
   const total = groups.length;
@@ -472,19 +509,34 @@ export function SessionWorkout({
             <p className="truncate text-sm text-ga-muted">{session.title}</p>
             <p className="text-sm text-ga-muted">{stepLabel}</p>
           </div>
-          <div className="flex shrink-0 gap-1">
-            {groups.map((workoutGroup, groupIndex) => (
-              <span
-                key={
-                  workoutGroup.kind === "single"
-                    ? workoutGroup.item.id
-                    : workoutGroup.items.map((item) => item.id).join("-")
-                }
-                className={`h-1.5 w-4 rounded-full sm:w-5 ${
-                  groupIndex <= index ? "bg-ga-lime" : "bg-ga-elevated"
-                }`}
-              />
-            ))}
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleDense}
+              aria-pressed={dense}
+              title={dense ? "Texte normal" : "Texte réduit"}
+              className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                dense
+                  ? "border-ga-lime bg-ga-lime/15 text-ga-lime"
+                  : "border-ga-border bg-ga-elevated text-ga-muted hover:text-ga-fg"
+              }`}
+            >
+              A−
+            </button>
+            <div className="flex gap-1">
+              {groups.map((workoutGroup, groupIndex) => (
+                <span
+                  key={
+                    workoutGroup.kind === "single"
+                      ? workoutGroup.item.id
+                      : workoutGroup.items.map((item) => item.id).join("-")
+                  }
+                  className={`h-1.5 w-4 rounded-full sm:w-5 ${
+                    groupIndex <= index ? "bg-ga-lime" : "bg-ga-elevated"
+                  }`}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
@@ -493,6 +545,7 @@ export function SessionWorkout({
             group={group}
             drafts={drafts}
             onDraftChange={updateDraft}
+            dense={dense}
             disabled={advancing}
           />
         </div>

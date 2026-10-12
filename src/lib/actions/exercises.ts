@@ -20,6 +20,7 @@ const GROUPS: MuscleGroup[] = [
   "mobilite",
   "balistique",
   "pliometrie",
+  "etirement",
 ];
 
 export async function createExercise(

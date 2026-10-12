@@ -876,7 +876,8 @@ export function ProgramEditor({
                           {templates.length === 0 ? (
                             <p className="text-xs text-ga-muted">
                               Aucun sous-programme. Crée-en un dans l’onglet
-                              Sous-programme.
+                              Sous-programme (accessible aussi sans sportif
+                              sélectionné).
                             </p>
                           ) : (
                             <>

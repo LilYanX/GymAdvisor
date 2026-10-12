@@ -10,6 +10,7 @@ export function loggingRepsForExercise(item: {
   const unit = item.target_unit ?? "reps";
   if (unit === "meters") return null;
   if (unit === "seconds") return item.target_secondary_reps ?? null;
+  // reps, minutes, respirations : quantité principale loggable
   return item.target_reps;
 }
 

@@ -17,7 +17,7 @@ export function AthleteWeek({ data }: { data: AthleteProgram }) {
             const href =
               session.session_type === "workout" ||
               session.session_type === "optional"
-                ? `/app/seance/${session.id}`
+                ? `/app/programme/seance/${session.id}`
                 : undefined;
             const badge =
               day.kind === "completed"

@@ -4,6 +4,8 @@ export const TARGET_UNIT_LABELS: Record<TargetUnit, string> = {
   reps: "Reps",
   meters: "Mètres",
   seconds: "Secondes",
+  minutes: "Minutes",
+  respirations: "Respirations",
 };
 
 export function formatPrescriptionQuantity(
@@ -17,7 +19,11 @@ export function formatPrescriptionQuantity(
       ? `${quantity} m`
       : unit === "seconds"
         ? `${quantity} s`
-        : `${quantity}`;
+        : unit === "minutes"
+          ? `${quantity} min`
+          : unit === "respirations"
+            ? `${quantity} resp.`
+            : `${quantity}`;
   const base = `${setsCount} × ${quantityLabel}`;
   if (unit === "seconds" && secondaryReps != null) {
     return `${base} · ${secondaryReps} reps`;
@@ -34,6 +40,7 @@ export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
   mobilite: "Mobilité",
   balistique: "Balistique",
   pliometrie: "Pliométrie",
+  etirement: "Étirement",
 };
 
 export const SESSION_TYPE_LABELS: Record<SessionType, string> = {

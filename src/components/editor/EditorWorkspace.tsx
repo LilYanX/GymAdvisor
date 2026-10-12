@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { EditorData } from "@/lib/editor-types";
 import type { Exercise } from "@/lib/supabase/models";
 import { ProgramEditor } from "@/components/editor/ProgramEditor";
@@ -15,12 +15,20 @@ export function EditorWorkspace({
   data,
   templates: initialTemplates,
   library,
+  programFallback,
+  athleteBar,
+  defaultTab = "program",
 }: {
-  data: EditorData;
+  data?: EditorData | null;
   templates: SavedTemplate[];
   library: Exercise[];
+  /** Contenu de l’onglet Programme quand aucun sportif n’est sélectionné. */
+  programFallback?: ReactNode;
+  /** Barre de choix sportif — visible uniquement sur l’onglet Programme. */
+  athleteBar?: ReactNode;
+  defaultTab?: TabId;
 }) {
-  const [tab, setTab] = useState<TabId>("program");
+  const [tab, setTab] = useState<TabId>(defaultTab);
   const [templates, setTemplates] = useState(initialTemplates);
 
   useEffect(() => {
@@ -55,8 +63,17 @@ export function EditorWorkspace({
           </button>
         </div>
       </div>
+      {tab === "program" && athleteBar ? (
+        <div className="shrink-0">{athleteBar}</div>
+      ) : null}
       {tab === "program" ? (
-        <ProgramEditor data={data} templates={templates} />
+        data ? (
+          <ProgramEditor data={data} templates={templates} />
+        ) : (
+          <div className="ga-scrollbar-hidden min-h-0 min-w-0 flex-1 overflow-y-auto">
+            {programFallback}
+          </div>
+        )
       ) : (
         <SubProgramEditor
           library={library}
