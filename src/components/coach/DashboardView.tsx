@@ -1,7 +1,12 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import type { DashboardData } from "@/lib/dashboard";
+import type { DashboardData, DashboardTodo } from "@/lib/dashboard";
 import { formatHeaderDate } from "@/lib/dates";
+import {
+  SESSION_REMINDER_SUBJECT,
+  sessionReminderMessage,
+  whatsappUrl,
+} from "@/lib/phone";
 import { StatusPill } from "@/components/coach/StatusPill";
 import {
   IconBell,
@@ -11,10 +16,51 @@ import {
   IconFile,
   IconUser,
   IconUsers,
+  IconWhatsApp,
 } from "@/components/icons";
 
-export function DashboardView({ data }: { data: DashboardData }) {
+type TodoGroup = {
+  athleteId: string;
+  firstName: string;
+  todos: DashboardTodo[];
+};
+
+function groupTodosByAthlete(
+  todos: DashboardTodo[],
+  athletes: DashboardData["athletes"],
+): TodoGroup[] {
+  const nameById = new Map(
+    athletes.map((athlete) => [athlete.id, athlete.firstName]),
+  );
+  const groups: TodoGroup[] = [];
+  const indexById = new Map<string, number>();
+
+  for (const todo of todos) {
+    const existing = indexById.get(todo.athleteId);
+    if (existing != null) {
+      groups[existing].todos.push(todo);
+      continue;
+    }
+    indexById.set(todo.athleteId, groups.length);
+    groups.push({
+      athleteId: todo.athleteId,
+      firstName: nameById.get(todo.athleteId) ?? "Sportif",
+      todos: [todo],
+    });
+  }
+
+  return groups;
+}
+
+export function DashboardView({
+  data,
+  coachFirstName,
+}: {
+  data: DashboardData;
+  coachFirstName: string;
+}) {
   const { athletes, todos, kpis } = data;
+  const todoGroups = groupTodosByAthlete(todos, athletes);
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
@@ -79,57 +125,75 @@ export function DashboardView({ data }: { data: DashboardData }) {
                 </tr>
               </thead>
               <tbody>
-                {athletes.map((athlete) => (
-                  <tr key={athlete.id}>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ga-elevated text-xs font-semibold">
-                          {athlete.initials}
-                        </span>
-                        <span className="font-medium">{athlete.firstName}</span>
-                      </div>
-                    </td>
-                    <td className="max-w-56 truncate px-5 py-3 text-ga-muted">
-                      {athlete.goal || "-"}
-                    </td>
-                    <td className="px-5 py-3 text-ga-muted">
-                      {athlete.lastSessionLabel ?? "-"}
-                    </td>
-                    <td className="px-5 py-3">
-                      <StatusPill status={athlete.status} />
-                    </td>
-                    <td className="px-5 py-3 text-ga-muted">
-                      {athlete.weekTotal > 0
-                        ? `${athlete.weekDone}/${athlete.weekTotal}`
-                        : "-"}
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <a
-                          href={`mailto:${athlete.email}?subject=${encodeURIComponent("Petit rappel - ta séance")}&body=${encodeURIComponent(`Salut ${athlete.firstName},\n\nPense à renseigner ta séance, j'en ai besoin pour la suite.\n\n- Lilia`)}`}
-                          title="Relancer"
-                          className="rounded-md p-1.5 text-ga-muted hover:bg-ga-elevated hover:text-ga-fg"
-                        >
-                          <IconBell className="h-4 w-4" />
-                        </a>
-                        <Link
-                          href={`/editeur?athlete=${athlete.id}`}
-                          title="Voir le programme"
-                          className="rounded-md p-1.5 text-ga-muted hover:bg-ga-elevated hover:text-ga-fg"
-                        >
-                          <IconFile className="h-4 w-4" />
-                        </Link>
-                        <Link
-                          href={`/sportifs/${athlete.id}`}
-                          title="Fiche sportif"
-                          className="rounded-md p-1.5 text-ga-muted hover:bg-ga-elevated hover:text-ga-fg"
-                        >
-                          <IconUser className="h-4 w-4" />
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {athletes.map((athlete) => {
+                  const reminderBody = sessionReminderMessage(
+                    athlete.firstName,
+                    coachFirstName,
+                  );
+                  const waHref = whatsappUrl(athlete.phone, reminderBody);
+                  return (
+                    <tr key={athlete.id}>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ga-elevated text-xs font-semibold">
+                            {athlete.initials}
+                          </span>
+                          <span className="font-medium">{athlete.firstName}</span>
+                        </div>
+                      </td>
+                      <td className="max-w-56 truncate px-5 py-3 text-ga-muted">
+                        {athlete.goal || "-"}
+                      </td>
+                      <td className="px-5 py-3 text-ga-muted">
+                        {athlete.lastSessionLabel ?? "-"}
+                      </td>
+                      <td className="px-5 py-3">
+                        <StatusPill status={athlete.status} />
+                      </td>
+                      <td className="px-5 py-3 text-ga-muted">
+                        {athlete.weekTotal > 0
+                          ? `${athlete.weekDone}/${athlete.weekTotal}`
+                          : "-"}
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <a
+                            href={`mailto:${athlete.email}?subject=${encodeURIComponent(SESSION_REMINDER_SUBJECT)}&body=${encodeURIComponent(reminderBody)}`}
+                            title="Relancer par e-mail"
+                            className="rounded-md p-1.5 text-ga-muted hover:bg-ga-elevated hover:text-ga-fg"
+                          >
+                            <IconBell className="h-4 w-4" />
+                          </a>
+                          {waHref ? (
+                            <a
+                              href={waHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Relancer par WhatsApp"
+                              className="rounded-md p-1.5 text-ga-muted hover:bg-ga-elevated hover:text-ga-fg"
+                            >
+                              <IconWhatsApp className="h-4 w-4" />
+                            </a>
+                          ) : null}
+                          <Link
+                            href={`/editeur?athlete=${athlete.id}`}
+                            title="Voir le programme"
+                            className="rounded-md p-1.5 text-ga-muted hover:bg-ga-elevated hover:text-ga-fg"
+                          >
+                            <IconFile className="h-4 w-4" />
+                          </Link>
+                          <Link
+                            href={`/sportifs/${athlete.id}`}
+                            title="Fiche sportif"
+                            className="rounded-md p-1.5 text-ga-muted hover:bg-ga-elevated hover:text-ga-fg"
+                          >
+                            <IconUser className="h-4 w-4" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -138,26 +202,42 @@ export function DashboardView({ data }: { data: DashboardData }) {
 
       <section>
         <h2 className="mb-3 text-base font-semibold">À faire aujourd’hui</h2>
-        {todos.length === 0 ? (
+        {todoGroups.length === 0 ? (
           <p className="text-sm text-ga-muted">Rien de bloquant pour aujourd’hui.</p>
         ) : (
-          <div className="grid grid-cols-3 gap-3">
-            {todos.map((todo) => (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {todoGroups.map((group) => (
               <article
-                key={todo.id}
+                key={group.athleteId}
                 className="rounded-xl border border-ga-border bg-ga-card p-4"
               >
-                <div className="mb-3">
-                  <StatusPill status={todo.kind} />
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">{group.firstName}</h3>
+                  <Link
+                    href={`/sportifs/${group.athleteId}`}
+                    className="text-xs text-ga-muted hover:text-ga-lime"
+                  >
+                    Fiche →
+                  </Link>
                 </div>
-                <h3 className="text-sm font-semibold">{todo.title}</h3>
-                <p className="mt-1 text-sm text-ga-muted">{todo.detail}</p>
-                <Link
-                  href={todo.href}
-                  className="mt-4 inline-block text-sm text-ga-muted hover:text-ga-lime"
-                >
-                  Ouvrir →
-                </Link>
+                <ul className="flex flex-col gap-3">
+                  {group.todos.map((todo) => (
+                    <li
+                      key={todo.id}
+                      className="border-t border-ga-border pt-3 first:border-t-0 first:pt-0"
+                    >
+                      <StatusPill status={todo.kind} />
+                      <p className="mt-2 text-sm font-medium">{todo.title}</p>
+                      <p className="mt-1 text-sm text-ga-muted">{todo.detail}</p>
+                      <Link
+                        href={todo.href}
+                        className="mt-2 inline-block text-sm text-ga-muted hover:text-ga-lime"
+                      >
+                        Ouvrir →
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
               </article>
             ))}
           </div>

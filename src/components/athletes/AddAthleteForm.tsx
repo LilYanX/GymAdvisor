@@ -47,6 +47,15 @@ export function AddAthleteForm({ redirectTo }: { redirectTo?: string }) {
         />
       </label>
       <label className="text-sm md:col-span-2">
+        <span className="mb-1.5 block text-ga-muted">Téléphone</span>
+        <input
+          name="phone"
+          type="tel"
+          placeholder="06… ou +33…"
+          className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
+        />
+      </label>
+      <label className="text-sm md:col-span-2">
         <span className="mb-1.5 block text-ga-muted">Objectif</span>
         <input
           name="goal"

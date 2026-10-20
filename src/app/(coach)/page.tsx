@@ -8,7 +8,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <DashboardView data={data} />
+      <DashboardView data={data} coachFirstName={profile.first_name} />
     </div>
   );
 }

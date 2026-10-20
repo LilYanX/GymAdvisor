@@ -162,6 +162,16 @@ export function AthleteDetailView({
             />
           </label>
           <label className="col-span-2 text-xs text-ga-muted">
+            Téléphone
+            <input
+              name="phone"
+              type="tel"
+              placeholder="06… ou +33…"
+              defaultValue={athlete.phone ?? ""}
+              className={fieldClassName}
+            />
+          </label>
+          <label className="col-span-2 text-xs text-ga-muted">
             Objectif
             <input
               name="goal"

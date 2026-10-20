@@ -25,6 +25,7 @@ export type DashboardAthleteRow = {
   firstName: string;
   lastName: string;
   email: string;
+  phone: string | null;
   goal: string;
   initials: string;
   lastSessionLabel: string | null;
@@ -233,6 +234,7 @@ function buildAthleteRow(
     firstName: athlete.first_name,
     lastName: athlete.last_name,
     email: athlete.email,
+    phone: athlete.phone,
     goal: athlete.goal,
     initials: initials(athlete.first_name, athlete.last_name),
     lastSessionLabel: lastSession ? formatDayMonth(lastSession) : null,

@@ -51,6 +51,7 @@ export type Database = {
           coach_id: string;
           profile_id: string | null;
           email: string;
+          phone: string | null;
           first_name: string;
           last_name: string;
           goal: string;
@@ -68,6 +69,7 @@ export type Database = {
           coach_id: string;
           profile_id?: string | null;
           email: string;
+          phone?: string | null;
           first_name: string;
           last_name?: string;
           goal?: string;
@@ -85,6 +87,7 @@ export type Database = {
           coach_id?: string;
           profile_id?: string | null;
           email?: string;
+          phone?: string | null;
           first_name?: string;
           last_name?: string;
           goal?: string;

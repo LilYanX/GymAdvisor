@@ -123,6 +123,7 @@ export async function createAthlete(
   const firstName = String(formData.get("first_name") ?? "").trim();
   const lastName = String(formData.get("last_name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const phone = String(formData.get("phone") ?? "").trim() || null;
   const goal = String(formData.get("goal") ?? "").trim();
   const totalWeeksRaw = Number(formData.get("total_weeks") ?? 12);
   const totalWeeks =
@@ -170,6 +171,7 @@ export async function createAthlete(
         first_name: firstName,
         last_name: lastName,
         email,
+        phone,
         goal,
         total_weeks: totalWeeks,
         current_week: 1,
@@ -196,7 +198,7 @@ export async function createAthlete(
     if (athleteId) {
       await supabase
         .from("athletes")
-        .update({ total_weeks: totalWeeks, current_week: 1 })
+        .update({ total_weeks: totalWeeks, current_week: 1, phone })
         .eq("id", athleteId)
         .eq("coach_id", user.id);
     }
@@ -250,6 +252,7 @@ export async function updateAthlete(
   const firstName = String(formData.get("first_name") ?? "").trim();
   const lastName = String(formData.get("last_name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const phone = String(formData.get("phone") ?? "").trim() || null;
   const goal = String(formData.get("goal") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
   const currentWeek = Number(formData.get("current_week") ?? 1);
@@ -265,6 +268,7 @@ export async function updateAthlete(
       first_name: firstName,
       last_name: lastName,
       email,
+      phone,
       goal,
       notes,
       current_week: Number.isFinite(currentWeek) && currentWeek >= 1 ? currentWeek : 1,
