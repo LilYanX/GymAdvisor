@@ -377,6 +377,7 @@ export type WeekSyncPayload = {
   sessions: Array<{
     id: string;
     weekday: number;
+    scheduled_date: string | null;
     title: string;
     session_type: SessionType;
     rest_details: string | null;
@@ -404,6 +405,7 @@ export function serializeWeekForSync(week: EditorWeek): WeekSyncPayload {
     sessions: week.sessions.map((session) => ({
       id: session.id,
       weekday: session.weekday,
+      scheduled_date: session.scheduled_date,
       title: session.title,
       session_type: session.session_type,
       rest_details: session.rest_details || null,

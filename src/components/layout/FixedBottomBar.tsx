@@ -20,7 +20,7 @@ export function FixedBottomBar({
       <div
         className={
           variant === "athlete"
-            ? "mx-auto w-full max-w-md px-5 py-3"
+            ? "mx-auto w-full max-w-2xl px-5 py-3"
             : "px-6 py-3"
         }
       >

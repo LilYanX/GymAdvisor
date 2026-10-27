@@ -28,6 +28,11 @@ export type AthleteDay = {
   kind: DayKind;
 };
 
+export type AthleteCalendarMarker = {
+  activityCount: number;
+  hasPlannedSession: boolean;
+};
+
 export type AthleteProgram = {
   athlete: Athlete;
   coachFirstName: string;
@@ -38,4 +43,6 @@ export type AthleteProgram = {
   programJustPublished: boolean;
   activities: AthleteActivity[];
   todayISO: string;
+  /** Pastilles calendrier (activités + séances planifiées non terminées). */
+  calendarMarkers: Record<string, AthleteCalendarMarker>;
 };

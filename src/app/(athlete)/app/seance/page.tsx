@@ -7,10 +7,8 @@ export default async function SeanceIndexPage() {
   if (!athlete) return null;
   const data = await getAthleteProgram(athlete);
   const todayType = data.today?.session.session_type;
-  const target =
-    todayType === "workout" || todayType === "optional"
-      ? data.today!.session
-      : data.overdue?.session;
-  if (target) redirect(`/app/seance/${target.id}`);
-  redirect("/app");
+  if (todayType === "workout" || todayType === "optional") {
+    redirect(`/app/seance/${data.today!.session.id}`);
+  }
+  redirect("/app/programme");
 }

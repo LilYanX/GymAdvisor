@@ -21,7 +21,7 @@ export default async function AthleteLayout({
 
   if (!athlete) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
+      <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center px-6">
         <h1 className="text-2xl font-semibold">Compte en attente</h1>
         <p className="mt-3 text-sm text-ga-muted">{profile.email}</p>
         <form action={signOut} className="mt-8">
@@ -57,7 +57,7 @@ export default async function AthleteLayout({
 
   if (isPaymentBlocked(payments, today, settings)) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
+      <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center px-6">
         <h1 className="text-2xl font-semibold">Accès en pause</h1>
         {overduePayments.length > 0 ? (
           <p className="mt-3 text-sm text-ga-muted">
@@ -87,8 +87,8 @@ export default async function AthleteLayout({
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-ga-bg">
-      <div className="flex min-h-0 flex-1 flex-col pb-14">{children}</div>
+    <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col bg-ga-bg">
+      <div className="flex min-h-0 flex-1 flex-col pb-20">{children}</div>
       <AthleteNav />
     </div>
   );

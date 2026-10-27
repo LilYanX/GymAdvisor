@@ -40,6 +40,9 @@ import {
 import { IconCopy, IconPlus, IconTrash } from "@/components/icons";
 import { ExerciseMedia } from "@/components/media/ExerciseMedia";
 import { useLoading } from "@/components/layout/LoadingProvider";
+import { SessionDatePicker } from "@/components/editor/SessionDatePicker";
+import { PreviousWeekPerfPanel } from "@/components/editor/PreviousWeekPerfPanel";
+import { isoWeekday } from "@/lib/dates";
 
 type ExerciseGroup =
   | { kind: "single"; item: EditorSessionExercise; index: number }
@@ -161,6 +164,7 @@ export function ProgramEditor({
   const [copyDaySessionId, setCopyDaySessionId] = useState<string | null>(null);
   const [sourceWeek, setSourceWeek] = useState<number | "">("");
   const [copying, startCopy] = useTransition();
+  const [prevPerfOpen, setPrevPerfOpen] = useState(true);
   const libraryScrollRef = useRef<HTMLDivElement>(null);
   const sessionScrollRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -210,6 +214,24 @@ export function ProgramEditor({
     setDraftWeek((current) => {
       if (!current) return current;
       return patchSessionInWeek(current, sessionId, patch);
+    });
+    setDirty(true);
+  }
+
+  function setSessionDate(sessionId: string, date: string) {
+    setDraftWeek((current) => {
+      if (!current) return current;
+      const session = current.sessions.find((item) => item.id === sessionId);
+      if (!session) return current;
+      const nextWeekday = isoWeekday(date);
+      const conflict = current.sessions.some(
+        (item) => item.id !== sessionId && item.weekday === nextWeekday,
+      );
+      return patchSessionInWeek(current, sessionId, {
+        scheduled_date: date,
+        weekday: conflict ? session.weekday : nextWeekday,
+        sort_order: conflict ? session.sort_order : nextWeekday,
+      });
     });
     setDirty(true);
   }
@@ -465,6 +487,20 @@ export function ProgramEditor({
               </div>
             ) : null}
           </div>
+          {data.weekNumber > 1 ? (
+            <button
+              type="button"
+              onClick={() => setPrevPerfOpen((current) => !current)}
+              className={`rounded-lg px-3 py-1.5 text-sm ${
+                prevPerfOpen
+                  ? "bg-ga-lime/15 text-ga-lime"
+                  : "bg-ga-elevated text-ga-muted hover:text-ga-fg"
+              }`}
+              title="Résumé réalisé semaine précédente"
+            >
+              Réalisé S{data.weekNumber - 1}
+            </button>
+          ) : null}
           <Link
             href={`/editeur?athlete=${data.athlete.id}&week=${Math.max(1, data.weekNumber - 1)}`}
             className="rounded-lg bg-ga-elevated px-3 py-1.5 text-sm text-ga-muted hover:text-ga-fg"
@@ -712,7 +748,7 @@ export function ProgramEditor({
                         session_type: event.target.value as SessionType,
                       })
                     }
-                    className="mx-4 mb-3 w-[calc(100%-2rem)] rounded-md border border-ga-border bg-ga-elevated px-2 py-1 text-xs"
+                    className="mx-4 mb-2 w-[calc(100%-2rem)] rounded-md border border-ga-border bg-ga-elevated px-2 py-1 text-xs"
                   >
                     {(Object.keys(SESSION_TYPE_LABELS) as SessionType[]).map(
                       (type) => (
@@ -722,6 +758,10 @@ export function ProgramEditor({
                       ),
                     )}
                   </select>
+                  <SessionDatePicker
+                    value={session.scheduled_date}
+                    onChange={(date) => setSessionDate(session.id, date)}
+                  />
                   </div>
                   <div
                     ref={(node) => {
@@ -966,6 +1006,12 @@ export function ProgramEditor({
               ) : null}
             </div>
           </div>
+          <PreviousWeekPerfPanel
+            open={prevPerfOpen && data.weekNumber > 1}
+            onClose={() => setPrevPerfOpen(false)}
+            previousWeekPerf={data.previousWeekPerf}
+            currentWeekNumber={data.weekNumber}
+          />
         </div>
       ) : null}
 

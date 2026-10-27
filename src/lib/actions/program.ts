@@ -249,7 +249,13 @@ export async function addSession(weekId: string, weekday: number, title: string)
 
 export async function updateSession(
   sessionId: string,
-  patch: { title?: string; session_type?: SessionType; rest_details?: string },
+  patch: {
+    title?: string;
+    session_type?: SessionType;
+    rest_details?: string;
+    scheduled_date?: string | null;
+    weekday?: number;
+  },
 ) {
   await requireCoach();
   const supabase = await createClient();
@@ -542,6 +548,7 @@ export async function syncWeekDraft(weekId: string, payload: WeekSyncPayload) {
         .insert({
           program_week_id: weekId,
           weekday: session.weekday,
+          scheduled_date: session.scheduled_date,
           title: session.title.trim() || session.title,
           session_type: session.session_type,
           rest_details: session.rest_details ?? "",
@@ -556,6 +563,7 @@ export async function syncWeekDraft(weekId: string, payload: WeekSyncPayload) {
         .from("sessions")
         .update({
           weekday: session.weekday,
+          scheduled_date: session.scheduled_date,
           title: session.title.trim() || session.title,
           session_type: session.session_type,
           rest_details: session.rest_details ?? "",
@@ -901,6 +909,7 @@ async function publishWeekCore(
   const weekMonday = addDaysISO(monday, offsetWeeks * 7);
 
   for (const session of sessions) {
+    if (session.scheduled_date) continue;
     const { error } = await supabase
       .from("sessions")
       .update({ scheduled_date: addDaysISO(weekMonday, session.weekday - 1) })

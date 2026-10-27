@@ -171,7 +171,7 @@ export function AthleteSessionOverview({
         )}
       </div>
 
-      <FixedBottomBar offsetClass="bottom-14" variant="athlete">
+      <FixedBottomBar offsetClass="bottom-20" variant="athlete">
         <Link
           href={`/app/seance/${session.id}`}
           className="flex w-full items-center justify-center rounded-xl bg-ga-lime py-3 text-sm font-semibold text-black hover:bg-lime-300"

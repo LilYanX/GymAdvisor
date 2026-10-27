@@ -12,6 +12,7 @@ import type {
   SetLog,
 } from "@/lib/supabase/models";
 import type {
+  AthleteCalendarMarker,
   AthleteDay,
   AthleteExercise,
   AthleteProgram,
@@ -219,7 +220,66 @@ export async function getAthleteProgram(
     .select("*")
     .eq("athlete_id", athlete.id)
     .order("performed_on", { ascending: false })
-    .limit(30);
+    .limit(120);
+
+  const activityRows = (activities ?? []) as AthleteActivity[];
+  const calendarMarkers: Record<string, AthleteCalendarMarker> = {};
+
+  for (const activity of activityRows) {
+    const date = activity.performed_on;
+    if (!date) continue;
+    const current = calendarMarkers[date] ?? {
+      activityCount: 0,
+      hasPlannedSession: false,
+    };
+    current.activityCount += 1;
+    calendarMarkers[date] = current;
+  }
+
+  const { data: publishedWeeks } = await supabase
+    .from("program_weeks")
+    .select("id")
+    .eq("athlete_id", athlete.id)
+    .eq("status", "published");
+
+  const publishedWeekIds = (publishedWeeks ?? []).map((item) => item.id);
+  if (publishedWeekIds.length > 0) {
+    const { data: plannedSessions } = await supabase
+      .from("sessions")
+      .select("id, scheduled_date, session_type")
+      .in("program_week_id", publishedWeekIds)
+      .in("session_type", ["workout", "optional"])
+      .not("scheduled_date", "is", null);
+
+    const planned = plannedSessions ?? [];
+    const plannedIds = planned.map((session) => session.id);
+    const { data: plannedLogs } =
+      plannedIds.length > 0
+        ? await supabase
+            .from("session_logs")
+            .select("session_id, status")
+            .eq("athlete_id", athlete.id)
+            .in("session_id", plannedIds)
+        : { data: [] };
+
+    const completedIds = new Set(
+      (plannedLogs ?? [])
+        .filter(
+          (log) => log.status === "completed" || log.status === "skipped",
+        )
+        .map((log) => log.session_id),
+    );
+
+    for (const session of planned) {
+      if (!session.scheduled_date || completedIds.has(session.id)) continue;
+      const current = calendarMarkers[session.scheduled_date] ?? {
+        activityCount: 0,
+        hasPlannedSession: false,
+      };
+      current.hasPlannedSession = true;
+      calendarMarkers[session.scheduled_date] = current;
+    }
+  }
 
   return {
     athlete,
@@ -229,8 +289,9 @@ export async function getAthleteProgram(
     today: todayDay,
     overdue,
     programJustPublished,
-    activities: (activities ?? []) as AthleteActivity[],
+    activities: activityRows,
     todayISO: today,
+    calendarMarkers,
   };
 }
 

@@ -13,6 +13,7 @@ import { useLoadingActive } from "@/components/layout/LoadingProvider";
 import { resolveExerciseSets } from "@/lib/athlete-sets";
 import {
   groupWorkoutExercises,
+  isWorkoutGroupComplete,
   workoutGroupItems,
   type WorkoutGroup,
 } from "@/lib/workout-groups";
@@ -119,7 +120,7 @@ function ExercisePanel({
     <section
       className={
         compact
-          ? "rounded-2xl border border-ga-blue/40 bg-ga-blue/5 p-3"
+          ? "rounded-2xl border border-ga-blue/40 bg-ga-blue/5 p-4"
           : undefined
       }
     >
@@ -132,22 +133,22 @@ function ExercisePanel({
       </div>
 
       <h2
-        className={`font-semibold ${compact ? "mt-3 text-lg" : "mt-5 text-2xl"}`}
+        className={`font-semibold ${compact ? "mt-4 text-2xl" : "mt-6 text-3xl"}`}
       >
         {item.exercise?.name ?? "Exercice"}
       </h2>
       <p
-        className={`font-semibold ${compact ? "mt-1 text-lg" : "mt-1 text-2xl"}`}
+        className={`font-semibold ${compact ? "mt-1.5 text-2xl" : "mt-2 text-3xl"}`}
       >
         {prescriptionMain(item)}
       </p>
       {details && !dense ? (
-        <p className={`mt-1 text-ga-muted ${compact ? "text-xs" : "text-sm"}`}>
+        <p className={`mt-1.5 text-ga-muted ${compact ? "text-sm" : "text-base"}`}>
           {details}
         </p>
       ) : null}
       {estimatedOneRm != null && !dense ? (
-        <p className={`mt-1 text-ga-muted ${compact ? "text-xs" : "text-sm"}`}>
+        <p className={`mt-1.5 text-ga-muted ${compact ? "text-sm" : "text-base"}`}>
           1RM estimée :{" "}
           <span className="font-medium text-ga-fg">{estimatedOneRm} kg</span>
           {percentOneRm != null ? (
@@ -160,8 +161,8 @@ function ExercisePanel({
       ) : null}
       {item.exercise?.cues && item.exercise.cues.length > 0 && !dense ? (
         <ol
-          className={`mt-3 list-decimal space-y-1.5 pl-4 text-ga-muted ${
-            compact ? "text-xs" : "text-sm"
+          className={`mt-4 list-decimal space-y-2 pl-5 text-ga-muted ${
+            compact ? "text-sm" : "text-base"
           }`}
         >
           {item.exercise.cues.slice(0, 6).map((cue) => (
@@ -170,20 +171,20 @@ function ExercisePanel({
         </ol>
       ) : null}
 
-      <div className="mt-4 w-full max-w-full">
-        <div className="grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem] items-center gap-x-2 gap-y-1 text-xs text-ga-muted">
+      <div className="mt-6 w-full max-w-full">
+        <div className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem] items-center gap-x-2.5 gap-y-1 text-sm text-ga-muted">
           <span>Sér.</span>
           <span>Charge</span>
           <span>Reps</span>
           <span className="text-center">Fait</span>
         </div>
-        <div className="mt-2 flex flex-col gap-2">
+        <div className="mt-3 flex flex-col gap-2.5">
           {draft.sets.map((set) => (
             <div
               key={set.set_number}
-              className="grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem] items-center gap-x-2"
+              className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem] items-center gap-x-2.5"
             >
-              <span className="text-sm text-ga-muted">{set.set_number}</span>
+              <span className="text-base text-ga-muted">{set.set_number}</span>
               <input
                 type="number"
                 inputMode="decimal"
@@ -195,7 +196,7 @@ function ExercisePanel({
                     event.target.value === "" ? null : Number(event.target.value);
                   updateSet(set.set_number, { weight_kg: weightKg });
                 }}
-                className="min-w-0 w-full max-w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-3 text-base outline-none focus:border-ga-lime"
+                className="min-w-0 w-full max-w-full rounded-xl border border-ga-border bg-ga-elevated px-3 py-3.5 text-lg outline-none focus:border-ga-lime"
               />
               <input
                 type="number"
@@ -207,7 +208,7 @@ function ExercisePanel({
                     event.target.value === "" ? null : Number(event.target.value);
                   updateSet(set.set_number, { reps });
                 }}
-                className="min-w-0 w-full max-w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-3 text-base outline-none focus:border-ga-lime"
+                className="min-w-0 w-full max-w-full rounded-xl border border-ga-border bg-ga-elevated px-3 py-3.5 text-lg outline-none focus:border-ga-lime"
               />
               <button
                 type="button"
@@ -215,7 +216,7 @@ function ExercisePanel({
                 onClick={() =>
                   updateSet(set.set_number, { completed: !set.completed })
                 }
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-base font-semibold ${
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-semibold ${
                   set.completed
                     ? "bg-ga-lime text-black"
                     : "bg-ga-elevated text-ga-muted"
@@ -228,16 +229,16 @@ function ExercisePanel({
         </div>
       </div>
 
-      <div className="mt-4">
-        <p className="text-sm text-ga-muted">RPE ressenti</p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
+      <div className="mt-6">
+        <p className="text-base text-ga-muted">RPE ressenti</p>
+        <div className="mt-3 flex flex-wrap gap-2">
           {Array.from({ length: 10 }, (_, i) => i + 1).map((value) => (
             <button
               key={value}
               type="button"
               disabled={disabled}
               onClick={() => onDraftChange({ ...draft, rpe: value })}
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${
+              className={`flex h-10 w-10 items-center justify-center rounded-full text-base ${
                 draft.rpe === value
                   ? "bg-ga-lime font-semibold text-black"
                   : "bg-ga-elevated text-ga-muted"
@@ -249,7 +250,7 @@ function ExercisePanel({
         </div>
       </div>
 
-      <label className="mt-4 block text-sm text-ga-muted">
+      <label className="mt-6 block text-base text-ga-muted">
         Commentaire
         <textarea
           value={draft.comment}
@@ -258,7 +259,7 @@ function ExercisePanel({
             onDraftChange({ ...draft, comment: event.target.value })
           }
           rows={2}
-          className="mt-2 w-full rounded-xl border border-ga-border bg-ga-elevated px-3 py-2 text-sm text-ga-fg outline-none focus:border-ga-lime"
+          className="mt-2 w-full rounded-xl border border-ga-border bg-ga-elevated px-4 py-3 text-base text-ga-fg outline-none focus:border-ga-lime"
         />
       </label>
     </section>
@@ -291,7 +292,7 @@ function GroupContent({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {group.items.map((item) => (
         <ExercisePanel
           key={item.id}
@@ -372,6 +373,34 @@ export function SessionWorkout({
     setIndex(index - 1);
   }
 
+  async function jumpToBloc(target: number) {
+    if (target === index || advancing) return;
+    setError(null);
+    setAdvancing(true);
+    try {
+      const exercises = workoutGroupItems(group);
+      await saveWorkoutDrafts(
+        exercises.map((exercise) => {
+          const draft = drafts[exercise.id];
+          return {
+            sessionExerciseId: exercise.id,
+            sets: draft.sets.map((set) => ({
+              setNumber: set.set_number,
+              weightKg: set.weight_kg,
+              reps: set.reps,
+              completed: set.completed,
+            })),
+            rpe: draft.rpe,
+            comment: draft.comment,
+          };
+        }),
+      );
+      setIndex(target);
+    } finally {
+      setAdvancing(false);
+    }
+  }
+
   async function goNext() {
     setError(null);
     setAdvancing(true);
@@ -433,30 +462,32 @@ export function SessionWorkout({
   if (confirmingEnd) {
     return (
       <>
-        <div className="px-5 pb-32 pt-8">
-          <p className="text-sm text-ga-muted">{session.title}</p>
-          <h1 className="mt-1 text-2xl font-semibold">Fin de séance</h1>
-          <label className="mt-8 block text-sm">
+        <div className="px-5 pb-36 pt-8">
+          <p className="text-base text-ga-muted">{session.title}</p>
+          <h1 className="mt-2 text-4xl font-semibold tracking-tight">
+            Fin de séance
+          </h1>
+          <label className="mt-8 block text-base">
             <span className="font-medium">Heure de fin</span>
             <input
               type="datetime-local"
               value={endedAt}
               onChange={(event) => setEndedAt(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-ga-border bg-ga-elevated px-3 py-2.5 text-sm outline-none focus:border-ga-lime"
+              className="mt-2 w-full rounded-xl border border-ga-border bg-ga-elevated px-4 py-3.5 text-base outline-none focus:border-ga-lime"
             />
           </label>
-          <div className="mt-6">
-            <p className="text-sm font-medium">RPE final</p>
-            <p className="mt-1 text-xs text-ga-muted">
+          <div className="mt-8">
+            <p className="text-lg font-medium">RPE final</p>
+            <p className="mt-1.5 text-sm text-ga-muted">
               Difficulté globale de la séance (1 = très facile, 10 = max)
             </p>
-            <div className="mt-3 grid grid-cols-5 gap-2">
+            <div className="mt-4 grid grid-cols-5 gap-2.5">
               {Array.from({ length: 10 }, (_, i) => i + 1).map((value) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setFinalRpe(value)}
-                  className={`rounded-xl py-2.5 text-sm font-semibold transition ${
+                  className={`rounded-xl py-3.5 text-base font-semibold transition ${
                     finalRpe === value
                       ? "bg-ga-lime text-black"
                       : "bg-ga-elevated text-ga-muted hover:text-ga-fg"
@@ -467,10 +498,10 @@ export function SessionWorkout({
               ))}
             </div>
           </div>
-          {error ? <p className="mt-4 text-sm text-ga-red">{error}</p> : null}
+          {error ? <p className="mt-4 text-base text-ga-red">{error}</p> : null}
         </div>
-        <FixedBottomBar offsetClass="bottom-14" variant="athlete">
-          <div className="flex gap-2">
+        <FixedBottomBar offsetClass="bottom-20" variant="athlete">
+          <div className="flex gap-2.5">
             <button
               type="button"
               disabled={advancing}
@@ -478,7 +509,7 @@ export function SessionWorkout({
                 setConfirmingEnd(false);
                 setError(null);
               }}
-              className="shrink-0 rounded-xl border border-ga-border bg-ga-elevated px-4 py-3 text-sm font-medium text-ga-fg disabled:opacity-60"
+              className="shrink-0 rounded-xl border border-ga-border bg-ga-elevated px-5 py-4 text-base font-medium text-ga-fg disabled:opacity-60"
             >
               Retour
             </button>
@@ -486,7 +517,7 @@ export function SessionWorkout({
               type="button"
               disabled={advancing}
               onClick={finishSession}
-              className="min-w-0 flex-1 rounded-xl bg-ga-lime py-3 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
+              className="min-w-0 flex-1 rounded-xl bg-ga-lime py-4 text-base font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
             >
               {advancing ? "Enregistrement…" : "Valider et terminer"}
             </button>
@@ -498,49 +529,38 @@ export function SessionWorkout({
 
   const stepLabel =
     group.kind === "superset"
-      ? `Superset ${index + 1} / ${total} · ${group.items.length} exos`
-      : `Exercice ${index + 1} / ${total}`;
+      ? `Bloc ${index + 1} / ${total} · Superset`
+      : `Bloc ${index + 1} / ${total}`;
+
+  const nextCta =
+    index + 1 >= total
+      ? "Terminer la séance"
+      : `Bloc terminé → Bloc ${index + 2}`;
 
   return (
     <>
-      <div className="min-w-0 overflow-x-hidden px-5 pb-32 pt-4">
+      <div className="min-w-0 overflow-x-hidden px-5 pb-64 pt-5">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate text-sm text-ga-muted">{session.title}</p>
-            <p className="text-sm text-ga-muted">{stepLabel}</p>
+            <p className="truncate text-base text-ga-muted">{session.title}</p>
+            <p className="mt-0.5 text-lg font-medium text-ga-fg">{stepLabel}</p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={toggleDense}
-              aria-pressed={dense}
-              title={dense ? "Texte normal" : "Texte réduit"}
-              className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
-                dense
-                  ? "border-ga-lime bg-ga-lime/15 text-ga-lime"
-                  : "border-ga-border bg-ga-elevated text-ga-muted hover:text-ga-fg"
-              }`}
-            >
-              A−
-            </button>
-            <div className="flex gap-1">
-              {groups.map((workoutGroup, groupIndex) => (
-                <span
-                  key={
-                    workoutGroup.kind === "single"
-                      ? workoutGroup.item.id
-                      : workoutGroup.items.map((item) => item.id).join("-")
-                  }
-                  className={`h-1.5 w-4 rounded-full sm:w-5 ${
-                    groupIndex <= index ? "bg-ga-lime" : "bg-ga-elevated"
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={toggleDense}
+            aria-pressed={dense}
+            title={dense ? "Texte normal" : "Texte réduit"}
+            className={`shrink-0 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+              dense
+                ? "border-ga-lime bg-ga-lime/15 text-ga-lime"
+                : "border-ga-border bg-ga-elevated text-ga-muted hover:text-ga-fg"
+            }`}
+          >
+            A−
+          </button>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-5">
           <GroupContent
             group={group}
             drafts={drafts}
@@ -550,31 +570,85 @@ export function SessionWorkout({
           />
         </div>
 
-        {error ? <p className="mt-3 text-sm text-ga-red">{error}</p> : null}
+        {error ? <p className="mt-4 text-base text-ga-red">{error}</p> : null}
       </div>
 
-      <FixedBottomBar offsetClass="bottom-14" variant="athlete">
-        <div className={`flex gap-2 ${index > 0 ? "" : ""}`}>
-          {index > 0 ? (
+      <div className="fixed inset-x-0 bottom-20 z-30 border-t border-ga-border bg-ga-panel/95 backdrop-blur-sm">
+        <div className="mx-auto w-full max-w-2xl px-5 py-3.5">
+          <div className="flex gap-2.5">
+            {index > 0 ? (
+              <button
+                type="button"
+                disabled={advancing}
+                onClick={goPrevious}
+                className="shrink-0 rounded-xl border border-ga-border bg-ga-elevated px-5 py-4 text-base font-medium text-ga-fg hover:border-ga-lime disabled:opacity-60"
+              >
+                Précédent
+              </button>
+            ) : null}
             <button
               type="button"
               disabled={advancing}
-              onClick={goPrevious}
-              className="shrink-0 rounded-xl border border-ga-border bg-ga-elevated px-4 py-3 text-sm font-medium text-ga-fg hover:border-ga-lime disabled:opacity-60"
+              onClick={goNext}
+              className="min-w-0 flex-1 rounded-xl bg-ga-lime py-4 text-base font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
             >
-              Précédent
+              {nextCta}
             </button>
-          ) : null}
-          <button
-            type="button"
-            disabled={advancing}
-            onClick={goNext}
-            className="min-w-0 flex-1 rounded-xl bg-ga-lime py-3 text-sm font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
-          >
-            {index + 1 >= total ? "Terminer la séance" : "Exercice suivant"}
-          </button>
+          </div>
         </div>
-      </FixedBottomBar>
+        <div className="border-t border-ga-border">
+          <div className="mx-auto flex w-full max-w-2xl gap-1.5 overflow-x-auto px-2 py-2.5">
+            {groups.map((workoutGroup, groupIndex) => {
+              const items = workoutGroupItems(workoutGroup);
+              const names = items
+                .map((item) => item.exercise?.name ?? "Exo")
+                .join(" · ");
+              const done = items.every((item) => {
+                const draft = drafts[item.id];
+                if (!draft || draft.sets.length === 0) {
+                  return isWorkoutGroupComplete({
+                    kind: "single",
+                    item,
+                  });
+                }
+                return draft.sets.every((set) => set.completed);
+              });
+              const active = groupIndex === index;
+              return (
+                <button
+                  key={
+                    workoutGroup.kind === "single"
+                      ? workoutGroup.item.id
+                      : workoutGroup.items.map((item) => item.id).join("-")
+                  }
+                  type="button"
+                  disabled={advancing}
+                  onClick={() => jumpToBloc(groupIndex)}
+                  className={`min-w-[5.25rem] flex-1 rounded-xl px-2 py-2 text-center transition disabled:opacity-60 ${
+                    active
+                      ? "bg-ga-lime text-black"
+                      : done
+                        ? "bg-ga-lime/15 text-ga-lime"
+                        : "bg-ga-elevated text-ga-muted"
+                  }`}
+                >
+                  <span className="block text-xs font-semibold leading-tight">
+                    Bloc {groupIndex + 1}
+                    {done && !active ? " ✓" : ""}
+                  </span>
+                  <span
+                    className={`mt-1 block truncate text-[11px] leading-tight ${
+                      active ? "text-black/70" : "opacity-80"
+                    }`}
+                  >
+                    {names}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </>
   );
 }

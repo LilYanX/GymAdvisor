@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { AthleteProgram } from "@/lib/athlete-types";
 import { weekdayLabel } from "@/lib/labels";
-import { AthleteActivitiesSection } from "@/components/athlete/AthleteActivitiesSection";
 
 export function AthleteWeek({ data }: { data: AthleteProgram }) {
   return (
@@ -64,11 +63,6 @@ export function AthleteWeek({ data }: { data: AthleteProgram }) {
           })}
         </div>
       )}
-
-      <AthleteActivitiesSection
-        activities={data.activities}
-        defaultDate={data.todayISO}
-      />
     </div>
   );
 }

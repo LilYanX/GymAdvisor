@@ -4,6 +4,7 @@ import type {
   ProgramWeek,
   Session,
   SessionExercise,
+  TargetUnit,
 } from "@/lib/supabase/models";
 
 export type EditorSessionExercise = SessionExercise & {
@@ -25,6 +26,36 @@ export type EditorOverviewAthlete = Pick<
   latestWeekStatus: "draft" | "published" | null;
 };
 
+export type PreviousWeekPerfSet = {
+  setNumber: number;
+  weightKg: number | null;
+  reps: number | null;
+  completed: boolean;
+};
+
+export type PreviousWeekPerfExercise = {
+  sessionExerciseId: string;
+  exerciseName: string;
+  prescribedSets: number;
+  prescribedReps: number;
+  prescribedUnit: TargetUnit;
+  prescribedWeightKg: number | null;
+  sets: PreviousWeekPerfSet[];
+};
+
+export type PreviousWeekPerfSession = {
+  sessionId: string;
+  title: string;
+  weekday: number;
+  scheduledDate: string | null;
+  exercises: PreviousWeekPerfExercise[];
+};
+
+export type PreviousWeekPerf = {
+  weekNumber: number;
+  sessions: PreviousWeekPerfSession[];
+};
+
 export type EditorData = {
   athlete: Athlete;
   athletes: Pick<Athlete, "id" | "first_name" | "last_name">[];
@@ -34,4 +65,6 @@ export type EditorData = {
   week: EditorWeek | null;
   weekNumber: number;
   availableWeeks: number[];
+  /** Réalisé de la semaine N-1 (charges / reps / séries). */
+  previousWeekPerf: PreviousWeekPerf | null;
 };

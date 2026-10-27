@@ -1,7 +1,12 @@
 import { requireCoach } from "@/lib/auth";
 import { bestEstimatedOneRm } from "@/lib/one-rm-formula";
 import { createClient } from "@/lib/supabase/server";
-import type { EditorData, EditorOverviewAthlete, EditorWeek } from "@/lib/editor-types";
+import type {
+  EditorData,
+  EditorOverviewAthlete,
+  EditorWeek,
+  PreviousWeekPerf,
+} from "@/lib/editor-types";
 import type { Exercise, SessionExercise, SetLog } from "@/lib/supabase/models";
 
 export type {
@@ -183,6 +188,13 @@ export async function getEditorData(
     };
   }
 
+  const previousWeekPerf = await loadPreviousWeekPerf(
+    supabase,
+    athleteFull.id,
+    weekNumber - 1,
+    (exercises ?? []) as Exercise[],
+  );
+
   return {
     ok: true,
     data: {
@@ -193,6 +205,94 @@ export async function getEditorData(
       week,
       weekNumber,
       availableWeeks,
+      previousWeekPerf,
     },
+  };
+}
+
+async function loadPreviousWeekPerf(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  athleteId: string,
+  previousWeekNumber: number,
+  exercises: Exercise[],
+): Promise<PreviousWeekPerf | null> {
+  if (previousWeekNumber < 1) return null;
+
+  const { data: prevWeek } = await supabase
+    .from("program_weeks")
+    .select("id, week_number")
+    .eq("athlete_id", athleteId)
+    .eq("week_number", previousWeekNumber)
+    .maybeSingle();
+
+  if (!prevWeek) return null;
+
+  const { data: sessions } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("program_week_id", prevWeek.id)
+    .in("session_type", ["workout", "optional"])
+    .order("weekday");
+
+  const sessionRows = sessions ?? [];
+  if (sessionRows.length === 0) {
+    return { weekNumber: previousWeekNumber, sessions: [] };
+  }
+
+  const sessionIds = sessionRows.map((session) => session.id);
+  const { data: sessionExercises } = await supabase
+    .from("session_exercises")
+    .select("*")
+    .in("session_id", sessionIds)
+    .order("sort_order");
+
+  const seRows = sessionExercises ?? [];
+  const seIds = seRows.map((item) => item.id);
+
+  const { data: setLogs } = seIds.length
+    ? await supabase
+        .from("set_logs")
+        .select("*")
+        .eq("athlete_id", athleteId)
+        .in("session_exercise_id", seIds)
+        .order("set_number")
+    : { data: [] };
+
+  const exerciseById = new Map(exercises.map((item) => [item.id, item]));
+  const setsBySe = new Map<string, SetLog[]>();
+  for (const set of (setLogs ?? []) as SetLog[]) {
+    const list = setsBySe.get(set.session_exercise_id) ?? [];
+    list.push(set);
+    setsBySe.set(set.session_exercise_id, list);
+  }
+
+  return {
+    weekNumber: previousWeekNumber,
+    sessions: sessionRows.map((session) => ({
+      sessionId: session.id,
+      title: session.title,
+      weekday: session.weekday,
+      scheduledDate: session.scheduled_date,
+      exercises: seRows
+        .filter((item) => item.session_id === session.id)
+        .map((item) => {
+          const sets = setsBySe.get(item.id) ?? [];
+          return {
+            sessionExerciseId: item.id,
+            exerciseName:
+              exerciseById.get(item.exercise_id)?.name ?? "Exercice",
+            prescribedSets: item.sets_count,
+            prescribedReps: item.target_reps,
+            prescribedUnit: item.target_unit ?? "reps",
+            prescribedWeightKg: item.target_weight_kg,
+            sets: sets.map((set) => ({
+              setNumber: set.set_number,
+              weightKg: set.weight_kg,
+              reps: set.reps,
+              completed: set.completed,
+            })),
+          };
+        }),
+    })),
   };
 }
