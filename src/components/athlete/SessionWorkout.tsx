@@ -17,7 +17,7 @@ import {
   workoutGroupItems,
   type WorkoutGroup,
 } from "@/lib/workout-groups";
-import { formatPrescriptionQuantity } from "@/lib/labels";
+import { formatPrescriptionQuantity, formatRest } from "@/lib/labels";
 import { toDatetimeLocalValue } from "@/lib/session-timing";
 import {
   evaluateOneRmFormula,
@@ -49,13 +49,24 @@ function prescriptionMain(item: AthleteExercise): string {
   );
 }
 
-function prescriptionDetails(item: AthleteExercise): string {
-  const parts: string[] = [];
-  if (item.tempo) parts.push(`tempo ${item.tempo}`);
-  if (item.target_weight_kg != null) parts.push(`vise ${item.target_weight_kg} kg`);
-  if (item.target_rpe != null) parts.push(`RPE ${item.target_rpe}`);
-  if (item.coach_note) parts.push(item.coach_note);
-  return parts.join(" · ");
+function prescriptionMeta(item: AthleteExercise): string[] {
+  const lines: string[] = [];
+  if (item.rest_seconds != null && item.rest_seconds > 0) {
+    lines.push(`Récupération ${formatRest(item.rest_seconds)}`);
+  }
+  if (item.tempo?.trim()) {
+    lines.push(`Tempo ${item.tempo.trim()}`);
+  }
+  if (item.target_weight_kg != null) {
+    lines.push(`Charge cible ${item.target_weight_kg} kg`);
+  }
+  if (item.target_rpe != null) {
+    lines.push(`RPE cible ${item.target_rpe}`);
+  }
+  if (item.coach_note?.trim()) {
+    lines.push(`Note : ${item.coach_note.trim()}`);
+  }
+  return lines;
 }
 
 function buildDraft(item: AthleteExercise): ExerciseDraft {
@@ -93,7 +104,7 @@ function ExercisePanel({
   disabled: boolean;
 }) {
   const videoUrl = item.exercise?.video_url;
-  const details = prescriptionDetails(item);
+  const metaLines = prescriptionMeta(item);
   const oneRmPick = pickSetForOneRm(draft.sets);
   const estimatedOneRm =
     oneRmPick && item.exercise?.one_rm_formula
@@ -142,10 +153,16 @@ function ExercisePanel({
       >
         {prescriptionMain(item)}
       </p>
-      {details && !dense ? (
-        <p className={`mt-1.5 text-ga-muted ${compact ? "text-sm" : "text-base"}`}>
-          {details}
-        </p>
+      {metaLines.length > 0 ? (
+        <ul
+          className={`mt-2 space-y-1 text-ga-muted ${
+            compact ? "text-sm" : "text-base"
+          }`}
+        >
+          {metaLines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
       ) : null}
       {estimatedOneRm != null && !dense ? (
         <p className={`mt-1.5 text-ga-muted ${compact ? "text-sm" : "text-base"}`}>
@@ -367,12 +384,6 @@ export function SessionWorkout({
     setDrafts((current) => ({ ...current, [exerciseId]: draft }));
   }
 
-  function goPrevious() {
-    if (index <= 0 || advancing) return;
-    setError(null);
-    setIndex(index - 1);
-  }
-
   async function jumpToBloc(target: number) {
     if (target === index || advancing) return;
     setError(null);
@@ -575,26 +586,14 @@ export function SessionWorkout({
 
       <div className="fixed inset-x-0 bottom-20 z-30 border-t border-ga-border bg-ga-panel/95 backdrop-blur-sm">
         <div className="mx-auto w-full max-w-2xl px-5 py-3.5">
-          <div className="flex gap-2.5">
-            {index > 0 ? (
-              <button
-                type="button"
-                disabled={advancing}
-                onClick={goPrevious}
-                className="shrink-0 rounded-xl border border-ga-border bg-ga-elevated px-5 py-4 text-base font-medium text-ga-fg hover:border-ga-lime disabled:opacity-60"
-              >
-                Précédent
-              </button>
-            ) : null}
-            <button
-              type="button"
-              disabled={advancing}
-              onClick={goNext}
-              className="min-w-0 flex-1 rounded-xl bg-ga-lime py-4 text-base font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
-            >
-              {nextCta}
-            </button>
-          </div>
+          <button
+            type="button"
+            disabled={advancing}
+            onClick={goNext}
+            className="w-full rounded-xl bg-ga-lime py-4 text-base font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
+          >
+            {nextCta}
+          </button>
         </div>
         <div className="border-t border-ga-border">
           <div className="mx-auto flex w-full max-w-2xl gap-1.5 overflow-x-auto px-2 py-2.5">
