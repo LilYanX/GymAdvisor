@@ -13,7 +13,7 @@ import {
   workoutGroupItems,
   type WorkoutGroup,
 } from "@/lib/workout-groups";
-import { weekdayLabel } from "@/lib/labels";
+import { formatPrescriptionQuantity, weekdayLabel } from "@/lib/labels";
 import { formatDayMonth } from "@/lib/dates";
 import { FixedBottomBar } from "@/components/layout/FixedBottomBar";
 import { ExercisePreviewSheet } from "@/components/athlete/ExercisePreviewSheet";
@@ -197,29 +197,42 @@ function BlocSummary({
         {isSuperset ? " — Superset" : ""}
       </p>
       <ul className="space-y-2">
-        {items.map((item, itemIndex) => (
-          <li key={item.id} className="flex items-center gap-2.5">
-            <span className="min-w-0 flex-1 truncate text-lg text-ga-fg">
-              <span className="text-ga-muted">
-                {letter}
-                {itemIndex + 1}){" "}
+        {items.map((item, itemIndex) => {
+          const prescription = formatPrescriptionQuantity(
+            item.sets_count,
+            item.target_reps,
+            item.target_unit ?? "reps",
+            item.target_secondary_reps ?? null,
+          );
+          return (
+            <li key={item.id} className="flex items-center gap-2.5">
+              <span className="min-w-0 flex-1 text-lg text-ga-fg">
+                <span className="text-ga-muted">
+                  {letter}
+                  {itemIndex + 1}){" "}
+                </span>
+                <span className="font-medium">
+                  {item.exercise?.name ?? "Exercice"}
+                </span>
+                <span className="mt-0.5 block text-base text-ga-muted">
+                  {prescription}
+                </span>
               </span>
-              {item.exercise?.name ?? "Exercice"}
-            </span>
-            <button
-              type="button"
-              onClick={() => onSelect(item)}
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-                item.exercise?.video_url
-                  ? "bg-ga-lime/15 text-ga-lime"
-                  : "bg-ga-elevated text-ga-muted"
-              }`}
-              title="Voir la vidéo"
-            >
-              <IconPlay className="h-5 w-5" />
-            </button>
-          </li>
-        ))}
+              <button
+                type="button"
+                onClick={() => onSelect(item)}
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                  item.exercise?.video_url
+                    ? "bg-ga-lime/15 text-ga-lime"
+                    : "bg-ga-elevated text-ga-muted"
+                }`}
+                title="Voir la vidéo"
+              >
+                <IconPlay className="h-5 w-5" />
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
