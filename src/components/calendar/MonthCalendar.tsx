@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { addDaysISO, capitalize, isoWeekday } from "@/lib/dates";
 
 export type CalendarDayMarker = {
-  /** Nombre d’activités libres ce jour (pastilles vertes). */
+  /** Activités libres + séances réalisées/skipped (pastilles vertes). */
   activityCount?: number;
   /** Séance programmée non terminée. */
   hasPlannedSession?: boolean;
@@ -209,7 +209,7 @@ export function MonthCalendar({
             >
               ✓
             </span>
-            Activité faite
+            Fait (activité / séance)
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span
@@ -217,7 +217,7 @@ export function MonthCalendar({
                 large ? "h-2 w-2" : "h-1.5 w-1.5"
               }`}
             />
-            Séance programmée
+            Séance à faire
           </span>
         </div>
       ) : null}

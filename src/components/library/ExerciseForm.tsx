@@ -5,7 +5,11 @@ import {
   createExercise,
   type ExerciseFormState,
 } from "@/lib/actions/exercises";
-import { MUSCLE_GROUP_LABELS } from "@/lib/labels";
+import {
+  DIFFICULTY_LEVEL_LABELS,
+  MUSCLE_GROUP_LABELS,
+  type DifficultyLevel,
+} from "@/lib/labels";
 import { uploadExerciseVideo } from "@/lib/storage/exercise-videos";
 import { useLoading } from "@/components/layout/LoadingProvider";
 import type { MuscleGroup } from "@/lib/supabase/models";
@@ -76,6 +80,33 @@ export function ExerciseForm() {
             </option>
           ))}
         </select>
+      </label>
+      <label className="min-w-0 text-sm">
+        <span className="mb-1.5 block text-ga-muted">Niveau (variante)</span>
+        <select
+          name="difficulty_level"
+          className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
+          defaultValue=""
+        >
+          <option value="">—</option>
+          {(Object.keys(DIFFICULTY_LEVEL_LABELS) as DifficultyLevel[]).map(
+            (level) => (
+              <option key={level} value={level}>
+                {DIFFICULTY_LEVEL_LABELS[level]}
+              </option>
+            ),
+          )}
+        </select>
+      </label>
+      <label className="min-w-0 text-sm">
+        <span className="mb-1.5 block text-ga-muted">
+          ID groupe variante (uuid partagé)
+        </span>
+        <input
+          name="variant_group_id"
+          placeholder="laisser vide si aucun"
+          className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 font-mono text-sm outline-none focus:border-ga-lime"
+        />
       </label>
       <label className="min-w-0 text-sm sm:col-span-2 xl:col-span-3">
         <span className="mb-1.5 block text-ga-muted">

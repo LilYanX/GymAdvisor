@@ -41,7 +41,7 @@ export function SessionStartTimeForm({
         </label>
         {error ? <p className="mt-4 text-base text-ga-red">{error}</p> : null}
       </div>
-      <FixedBottomBar offsetClass="bottom-20" variant="athlete">
+      <FixedBottomBar offsetClass="bottom-14" variant="athlete">
         <button
           type="button"
           disabled={pending}

@@ -119,7 +119,7 @@ export function SessionCheckInForm({
         </form>
       </div>
 
-      <FixedBottomBar offsetClass="bottom-20" variant="athlete">
+      <FixedBottomBar offsetClass="bottom-14" variant="athlete">
         <button
           type="submit"
           form="session-checkin-form"

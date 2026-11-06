@@ -568,7 +568,7 @@ export function ProgramEditor({
                   .
                 </p>
               ) : (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
+                <div className="grid grid-cols-2 gap-2">
                   {filteredExercises.map((exercise) => (
                     <button
                       key={exercise.id}
@@ -1113,11 +1113,11 @@ function ExerciseBlock({
       item.target_unit ?? "reps",
       item.target_secondary_reps ?? null,
     ),
+    item.target_weight_kg != null ? `${item.target_weight_kg} kg` : null,
     item.tempo ? `tempo ${item.tempo}` : null,
-    item.target_percent != null ? `@ ${item.target_percent}%` : null,
-    item.target_weight_kg != null ? `@ ${item.target_weight_kg} kg` : null,
-    item.target_rpe != null ? `@ RPE ${item.target_rpe}` : null,
     item.rest_seconds != null ? `repos ${formatRest(item.rest_seconds)}` : null,
+    item.target_percent != null ? `${item.target_percent}% 1RM` : null,
+    item.target_rpe != null ? `RPE ${item.target_rpe}` : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -1175,11 +1175,16 @@ function ExerciseBlock({
       </div>
       {expanded ? (
         <div className="grid grid-cols-2 gap-2 border-t border-ga-border p-3">
+          {/* 1. Séries / reps / charge */}
           <NumberField
             label="Séries"
             value={item.sets_count}
             disabled={pending}
-            onChange={(value) => onSave({ sets_count: value ?? 1 })}
+            min={1}
+            onChange={(value) => {
+              if (value == null || !Number.isFinite(value) || value < 1) return;
+              onSave({ sets_count: Math.round(value) });
+            }}
           />
           <label className="text-xs text-ga-muted">
             Unité
@@ -1240,6 +1245,25 @@ function ExerciseBlock({
             disabled={pending}
             onChange={saveWeight}
           />
+          {/* 2. Tempo */}
+          <label className="col-span-2 text-xs text-ga-muted">
+            Tempo
+            <input
+              value={item.tempo ?? ""}
+              disabled={pending}
+              onChange={(event) => onSave({ tempo: event.target.value })}
+              className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1.5 text-sm text-ga-fg outline-none focus:border-ga-lime"
+            />
+          </label>
+          {/* 3. Repos */}
+          <NumberField
+            label="Repos (sec)"
+            value={item.rest_seconds}
+            disabled={pending}
+            min={0}
+            onChange={(value) => onSave({ rest_seconds: value })}
+          />
+          {/* 4. %1RM */}
           <NumberField
             label="% 1RM"
             value={item.target_percent}
@@ -1263,22 +1287,6 @@ function ExerciseBlock({
             disabled={pending}
             onChange={(value) => onSave({ target_rpe: value })}
           />
-          <NumberField
-            label="Repos (sec)"
-            value={item.rest_seconds}
-            disabled={pending}
-            min={0}
-            onChange={(value) => onSave({ rest_seconds: value })}
-          />
-          <label className="col-span-2 text-xs text-ga-muted">
-            Tempo
-            <input
-              value={item.tempo ?? ""}
-              disabled={pending}
-              onChange={(event) => onSave({ tempo: event.target.value })}
-              className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1.5 text-sm text-ga-fg outline-none focus:border-ga-lime"
-            />
-          </label>
           <label className="col-span-2 text-xs text-ga-muted">
             Note
             <input
@@ -1335,6 +1343,7 @@ function NumberField({
       <input
         type="number"
         step="any"
+        min={min}
         value={value ?? ""}
         disabled={disabled}
         onChange={(event) => {

@@ -102,7 +102,9 @@ export async function saveWorkoutDrafts(
       completed: boolean;
     }>;
     rpe: number | null;
+    rir: number | null;
     comment: string;
+    selectedExerciseId?: string | null;
   }>,
 ) {
   const owned = await athleteOrError();
@@ -130,7 +132,9 @@ export async function saveWorkoutDrafts(
         session_exercise_id: exercise.sessionExerciseId,
         athlete_id: owned.athlete.id,
         rpe: exercise.rpe,
+        rir: exercise.rir,
         comment: exercise.comment,
+        selected_exercise_id: exercise.selectedExerciseId ?? null,
       },
       { onConflict: "session_exercise_id" },
     );

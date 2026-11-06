@@ -41,6 +41,9 @@ export type PreviousWeekPerfExercise = {
   prescribedUnit: TargetUnit;
   prescribedWeightKg: number | null;
   sets: PreviousWeekPerfSet[];
+  rpe: number | null;
+  rir: number | null;
+  comment: string | null;
 };
 
 export type PreviousWeekPerfSession = {

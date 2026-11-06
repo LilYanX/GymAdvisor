@@ -7,7 +7,11 @@ import {
   updateExercise,
   type ExerciseFormState,
 } from "@/lib/actions/exercises";
-import { MUSCLE_GROUP_LABELS } from "@/lib/labels";
+import {
+  DIFFICULTY_LEVEL_LABELS,
+  MUSCLE_GROUP_LABELS,
+  type DifficultyLevel,
+} from "@/lib/labels";
 import { ExerciseVideoUpload } from "@/components/library/ExerciseVideoUpload";
 import { useLoadingActive } from "@/components/layout/LoadingProvider";
 import type { Exercise, MuscleGroup } from "@/lib/supabase/models";
@@ -60,6 +64,34 @@ export function EditExerciseForm({ exercise }: { exercise: Exercise }) {
               </option>
             ))}
           </select>
+        </label>
+        <label className="min-w-0 text-sm">
+          <span className="mb-1.5 block text-ga-muted">Niveau (variante)</span>
+          <select
+            name="difficulty_level"
+            defaultValue={exercise.difficulty_level ?? ""}
+            className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 outline-none focus:border-ga-lime"
+          >
+            <option value="">—</option>
+            {(Object.keys(DIFFICULTY_LEVEL_LABELS) as DifficultyLevel[]).map(
+              (level) => (
+                <option key={level} value={level}>
+                  {DIFFICULTY_LEVEL_LABELS[level]}
+                </option>
+              ),
+            )}
+          </select>
+        </label>
+        <label className="min-w-0 text-sm sm:col-span-2">
+          <span className="mb-1.5 block text-ga-muted">
+            ID groupe variante (uuid partagé entre niveaux)
+          </span>
+          <input
+            name="variant_group_id"
+            defaultValue={exercise.variant_group_id ?? ""}
+            placeholder="même uuid = famille progressive"
+            className="w-full rounded-lg border border-ga-border bg-ga-elevated px-3 py-2 font-mono text-sm outline-none focus:border-ga-lime"
+          />
         </label>
         <label className="min-w-0 text-sm">
           <span className="mb-1.5 block text-ga-muted">URL vidéo / GIF</span>

@@ -1,5 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { isoWeekday, todayISO, yesterdayISO } from "@/lib/dates";
+import {
+  isoWeekday,
+  sessionDoneCalendarDate,
+  todayISO,
+  yesterdayISO,
+} from "@/lib/dates";
 import type {
   Athlete,
   AthleteActivity,
@@ -119,6 +124,7 @@ async function loadWeekDays(
           exercise: exerciseById.get(item.exercise_id) ?? null,
           log: null,
           sets: [],
+          variantOptions: [],
         })),
     };
     return { session: view, kind: kindFor(view, today) };
@@ -248,8 +254,7 @@ export async function getAthleteProgram(
       .from("sessions")
       .select("id, scheduled_date, session_type")
       .in("program_week_id", publishedWeekIds)
-      .in("session_type", ["workout", "optional"])
-      .not("scheduled_date", "is", null);
+      .in("session_type", ["workout", "optional"]);
 
     const planned = plannedSessions ?? [];
     const plannedIds = planned.map((session) => session.id);
@@ -257,21 +262,36 @@ export async function getAthleteProgram(
       plannedIds.length > 0
         ? await supabase
             .from("session_logs")
-            .select("session_id, status")
+            .select("session_id, status, started_at, completed_at")
             .eq("athlete_id", athlete.id)
             .in("session_id", plannedIds)
         : { data: [] };
 
-    const completedIds = new Set(
-      (plannedLogs ?? [])
-        .filter(
-          (log) => log.status === "completed" || log.status === "skipped",
-        )
-        .map((log) => log.session_id),
+    const logsBySession = new Map(
+      (plannedLogs ?? []).map((log) => [log.session_id, log]),
     );
 
     for (const session of planned) {
-      if (!session.scheduled_date || completedIds.has(session.id)) continue;
+      const log = logsBySession.get(session.id);
+      const done =
+        log?.status === "completed" || log?.status === "skipped";
+
+      if (done) {
+        const performed = sessionDoneCalendarDate(
+          log,
+          session.scheduled_date,
+        );
+        if (!performed) continue;
+        const current = calendarMarkers[performed] ?? {
+          activityCount: 0,
+          hasPlannedSession: false,
+        };
+        current.activityCount += 1;
+        calendarMarkers[performed] = current;
+        continue;
+      }
+
+      if (!session.scheduled_date) continue;
       const current = calendarMarkers[session.scheduled_date] ?? {
         activityCount: 0,
         hasPlannedSession: false,
@@ -361,14 +381,51 @@ export async function getAthleteSession(
     (exerciseLogs ?? []).map((item) => [item.session_exercise_id, item]),
   );
 
+  const variantGroupIds = [
+    ...new Set(
+      (exercises ?? [])
+        .map((item) => item.variant_group_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const { data: variantRows } =
+    variantGroupIds.length > 0
+      ? await supabase
+          .from("exercises")
+          .select("*")
+          .in("variant_group_id", variantGroupIds)
+      : { data: [] };
+
+  const variantsByGroup = new Map<string, Exercise[]>();
+  for (const row of (variantRows ?? []) as Exercise[]) {
+    if (!row.variant_group_id) continue;
+    const list = variantsByGroup.get(row.variant_group_id) ?? [];
+    list.push(row);
+    variantsByGroup.set(row.variant_group_id, list);
+  }
+
   return {
     ...session,
     log: log ?? null,
-    exercises: items.map((item) => ({
-      ...item,
-      exercise: exerciseById.get(item.exercise_id) ?? null,
-      log: feedbackById.get(item.id) ?? null,
-      sets: (setLogs ?? []).filter((set) => set.session_exercise_id === item.id),
-    })),
+    exercises: items.map((item) => {
+      const exercise = exerciseById.get(item.exercise_id) ?? null;
+      const variantOptions =
+        exercise?.variant_group_id
+          ? (variantsByGroup.get(exercise.variant_group_id) ?? []).slice().sort(
+              (a, b) =>
+                (a.difficulty_level ?? "").localeCompare(
+                  b.difficulty_level ?? "",
+                ),
+            )
+          : [];
+      return {
+        ...item,
+        exercise,
+        log: feedbackById.get(item.id) ?? null,
+        sets: (setLogs ?? []).filter((set) => set.session_exercise_id === item.id),
+        variantOptions,
+      };
+    }),
   };
 }

@@ -249,14 +249,23 @@ async function loadPreviousWeekPerf(
   const seRows = sessionExercises ?? [];
   const seIds = seRows.map((item) => item.id);
 
-  const { data: setLogs } = seIds.length
-    ? await supabase
-        .from("set_logs")
-        .select("*")
-        .eq("athlete_id", athleteId)
-        .in("session_exercise_id", seIds)
-        .order("set_number")
-    : { data: [] };
+  const [{ data: setLogs }, { data: exerciseLogs }] = await Promise.all([
+    seIds.length
+      ? supabase
+          .from("set_logs")
+          .select("*")
+          .eq("athlete_id", athleteId)
+          .in("session_exercise_id", seIds)
+          .order("set_number")
+      : Promise.resolve({ data: [] }),
+    seIds.length
+      ? supabase
+          .from("session_exercise_logs")
+          .select("session_exercise_id, rpe, rir, comment")
+          .eq("athlete_id", athleteId)
+          .in("session_exercise_id", seIds)
+      : Promise.resolve({ data: [] }),
+  ]);
 
   const exerciseById = new Map(exercises.map((item) => [item.id, item]));
   const setsBySe = new Map<string, SetLog[]>();
@@ -265,6 +274,9 @@ async function loadPreviousWeekPerf(
     list.push(set);
     setsBySe.set(set.session_exercise_id, list);
   }
+  const feedbackBySe = new Map(
+    (exerciseLogs ?? []).map((log) => [log.session_exercise_id, log]),
+  );
 
   return {
     weekNumber: previousWeekNumber,
@@ -277,6 +289,7 @@ async function loadPreviousWeekPerf(
         .filter((item) => item.session_id === session.id)
         .map((item) => {
           const sets = setsBySe.get(item.id) ?? [];
+          const feedback = feedbackBySe.get(item.id);
           return {
             sessionExerciseId: item.id,
             exerciseName:
@@ -291,6 +304,9 @@ async function loadPreviousWeekPerf(
               reps: set.reps,
               completed: set.completed,
             })),
+            rpe: feedback?.rpe ?? null,
+            rir: feedback?.rir ?? null,
+            comment: feedback?.comment?.trim() ? feedback.comment : null,
           };
         }),
     })),

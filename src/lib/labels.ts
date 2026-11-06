@@ -41,6 +41,15 @@ export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
   balistique: "Balistique",
   pliometrie: "Pliométrie",
   etirement: "Étirement",
+  objectif: "Objectif",
+};
+
+export type DifficultyLevel = "basique" | "intermediaire" | "avance";
+
+export const DIFFICULTY_LEVEL_LABELS: Record<DifficultyLevel, string> = {
+  basique: "Basique",
+  intermediaire: "Intermédiaire",
+  avance: "Avancé",
 };
 
 export const SESSION_TYPE_LABELS: Record<SessionType, string> = {

@@ -57,10 +57,10 @@ export function AthleteHome({ data }: { data: AthleteProgram }) {
   return (
     <div className="px-5 pb-10 pt-8">
       <header className="ga-fade-in">
-        <h1 className="mt-1 text-5xl font-semibold tracking-tight">
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight">
           Bonjour, {data.athlete.first_name}
         </h1>
-        <p className="mt-2.5 text-lg text-ga-muted">
+        <p className="mt-1.5 text-sm text-ga-muted">
           Semaine {data.athlete.current_week} / {data.athlete.total_weeks}
         </p>
       </header>
@@ -74,8 +74,8 @@ export function AthleteHome({ data }: { data: AthleteProgram }) {
       <section className="mt-6 rounded-2xl border border-ga-lime/35 bg-ga-lime/10 px-5 py-5">
         {plannedCount > 0 ? (
           <>
-            <p className="text-5xl font-semibold text-ga-lime">{plannedCount}</p>
-            <p className="mt-2 text-lg leading-snug text-ga-fg">
+            <p className="text-3xl font-semibold text-ga-lime">{plannedCount}</p>
+            <p className="mt-1.5 text-sm leading-snug text-ga-fg">
               séance{plannedCount > 1 ? "s" : ""} programmée
               {plannedCount > 1 ? "s" : ""} cette semaine
               {nextSession ? (

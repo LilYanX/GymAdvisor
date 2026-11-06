@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MUSCLE_GROUP_LABELS } from "@/lib/labels";
+import {
+  DIFFICULTY_LEVEL_LABELS,
+  MUSCLE_GROUP_LABELS,
+  type DifficultyLevel,
+} from "@/lib/labels";
 import type { Exercise, MuscleGroup } from "@/lib/supabase/models";
 import { ExerciseMedia } from "@/components/media/ExerciseMedia";
 
@@ -166,6 +170,9 @@ export function LibraryView({
                 <p className="mt-2 text-sm font-medium">{exercise.name}</p>
                 <p className="mt-0.5 text-xs text-ga-muted">
                   {MUSCLE_GROUP_LABELS[exercise.muscle_group]}
+                  {exercise.difficulty_level
+                    ? ` · ${DIFFICULTY_LEVEL_LABELS[exercise.difficulty_level as DifficultyLevel]}`
+                    : ""}
                 </p>
               </button>
             ))}
@@ -211,6 +218,12 @@ export function LibraryView({
             <h2 className="mt-4 text-xl font-semibold">{selected.name}</h2>
             <p className="mt-1 text-sm text-ga-muted">
               {MUSCLE_GROUP_LABELS[selected.muscle_group]}
+              {selected.difficulty_level
+                ? ` · ${DIFFICULTY_LEVEL_LABELS[selected.difficulty_level as DifficultyLevel]}`
+                : ""}
+              {selected.variant_group_id
+                ? ` · variante ${selected.variant_group_id.slice(0, 8)}…`
+                : ""}
             </p>
             {selected.cues.length > 0 ? (
               <ol className="mt-4 list-decimal space-y-1.5 pl-4 text-sm text-ga-muted">

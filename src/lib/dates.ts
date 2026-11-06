@@ -36,6 +36,27 @@ export function sessionPerformedDate(
   return scheduledDate ?? null;
 }
 
+/**
+ * Date calendrier « séance faite » : jour de validation/fin en priorité
+ * (rattrapage = pastille le jour réel, pas la date planifiée).
+ */
+export function sessionDoneCalendarDate(
+  log:
+    | {
+        started_at?: string | null;
+        completed_at?: string | null;
+      }
+    | null
+    | undefined,
+  scheduledDate: string | null | undefined,
+): string | null {
+  const fromCompleted = log?.completed_at
+    ? parisDateISO(log.completed_at)
+    : null;
+  if (fromCompleted) return fromCompleted;
+  return sessionPerformedDate(log, scheduledDate);
+}
+
 export function firstOfMonthISO(): string {
   return `${todayISO().slice(0, 7)}-01`;
 }

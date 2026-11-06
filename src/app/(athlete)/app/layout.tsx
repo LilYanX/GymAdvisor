@@ -88,7 +88,7 @@ export default async function AthleteLayout({
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col bg-ga-bg">
-      <div className="flex min-h-0 flex-1 flex-col pb-20">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col pb-14">{children}</div>
       <AthleteNav />
     </div>
   );

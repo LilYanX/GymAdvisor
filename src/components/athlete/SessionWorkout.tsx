@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AthleteExercise, AthleteSessionView } from "@/lib/athlete-types";
 import {
@@ -17,15 +17,14 @@ import {
   workoutGroupItems,
   type WorkoutGroup,
 } from "@/lib/workout-groups";
-import { formatPrescriptionQuantity, formatRest } from "@/lib/labels";
-import { toDatetimeLocalValue } from "@/lib/session-timing";
 import {
-  evaluateOneRmFormula,
-  percentOfOneRm,
-  pickSetForOneRm,
-} from "@/lib/one-rm-formula";
-
-const DENSE_STORAGE_KEY = "ga.workout.dense";
+  DIFFICULTY_LEVEL_LABELS,
+  formatPrescriptionQuantity,
+  formatRest,
+  type DifficultyLevel,
+} from "@/lib/labels";
+import { toDatetimeLocalValue } from "@/lib/session-timing";
+import type { Exercise } from "@/lib/supabase/models";
 
 type SetDraft = {
   set_number: number;
@@ -37,7 +36,9 @@ type SetDraft = {
 type ExerciseDraft = {
   sets: SetDraft[];
   rpe: number | null;
+  rir: number | null;
   comment: string;
+  selectedExerciseId: string | null;
 };
 
 function prescriptionMain(item: AthleteExercise): string {
@@ -49,26 +50,6 @@ function prescriptionMain(item: AthleteExercise): string {
   );
 }
 
-function prescriptionMeta(item: AthleteExercise): string[] {
-  const lines: string[] = [];
-  if (item.rest_seconds != null && item.rest_seconds > 0) {
-    lines.push(`Récupération ${formatRest(item.rest_seconds)}`);
-  }
-  if (item.tempo?.trim()) {
-    lines.push(`Tempo ${item.tempo.trim()}`);
-  }
-  if (item.target_weight_kg != null) {
-    lines.push(`Charge cible ${item.target_weight_kg} kg`);
-  }
-  if (item.target_rpe != null) {
-    lines.push(`RPE cible ${item.target_rpe}`);
-  }
-  if (item.coach_note?.trim()) {
-    lines.push(`Note : ${item.coach_note.trim()}`);
-  }
-  return lines;
-}
-
 function buildDraft(item: AthleteExercise): ExerciseDraft {
   return {
     sets: resolveExerciseSets(item).map((set) => ({
@@ -78,7 +59,10 @@ function buildDraft(item: AthleteExercise): ExerciseDraft {
       completed: set.completed,
     })),
     rpe: item.log?.rpe ?? null,
+    rir: item.log?.rir ?? null,
     comment: item.log?.comment ?? "",
+    selectedExerciseId:
+      item.log?.selected_exercise_id ?? item.exercise?.id ?? null,
   };
 }
 
@@ -88,32 +72,54 @@ function buildAllDrafts(
   return Object.fromEntries(exercises.map((item) => [item.id, buildDraft(item)]));
 }
 
+function resolveDisplayExercise(
+  item: AthleteExercise,
+  draft: ExerciseDraft,
+): Exercise | null {
+  if (draft.selectedExerciseId) {
+    const fromVariants = item.variantOptions.find(
+      (option) => option.id === draft.selectedExerciseId,
+    );
+    if (fromVariants) return fromVariants;
+    if (item.exercise?.id === draft.selectedExerciseId) return item.exercise;
+  }
+  return item.exercise;
+}
+
 function ExercisePanel({
   item,
   draft,
   onDraftChange,
   compact,
-  dense,
   disabled,
 }: {
   item: AthleteExercise;
   draft: ExerciseDraft;
   onDraftChange: (draft: ExerciseDraft) => void;
   compact?: boolean;
-  dense?: boolean;
   disabled: boolean;
 }) {
-  const videoUrl = item.exercise?.video_url;
-  const metaLines = prescriptionMeta(item);
-  const oneRmPick = pickSetForOneRm(draft.sets);
-  const estimatedOneRm =
-    oneRmPick && item.exercise?.one_rm_formula
-      ? evaluateOneRmFormula(item.exercise.one_rm_formula, oneRmPick)
-      : null;
-  const percentOneRm =
-    oneRmPick && estimatedOneRm != null
-      ? percentOfOneRm(oneRmPick.weight, estimatedOneRm)
-      : null;
+  const [cuesOpen, setCuesOpen] = useState(false);
+  const display = resolveDisplayExercise(item, draft);
+  const videoUrl = display?.video_url;
+  const cues = display?.cues ?? [];
+
+  const levelOptions = item.variantOptions.filter(
+    (option) => option.difficulty_level != null,
+  );
+
+  const followLines: Array<{ label: string; value: string }> = [
+    { label: "Séries", value: prescriptionMain(item) },
+  ];
+  if (item.tempo?.trim()) {
+    followLines.push({ label: "Tempo", value: item.tempo.trim() });
+  }
+  if (item.rest_seconds != null && item.rest_seconds > 0) {
+    followLines.push({
+      label: "Repos",
+      value: formatRest(item.rest_seconds),
+    });
+  }
 
   function updateSet(
     setNumber: number,
@@ -138,56 +144,82 @@ function ExercisePanel({
       <div className="overflow-hidden rounded-2xl bg-ga-elevated">
         <ExerciseMedia
           url={videoUrl}
-          name={item.exercise?.name ?? "Exercice"}
+          name={display?.name ?? item.exercise?.name ?? "Exercice"}
           className={compact ? "aspect-[4/3] w-full" : "aspect-video w-full"}
         />
       </div>
 
-      <h2
-        className={`font-semibold ${compact ? "mt-4 text-2xl" : "mt-6 text-3xl"}`}
+      <div
+        className={`flex items-start justify-between gap-3 ${
+          compact ? "mt-4" : "mt-6"
+        }`}
       >
-        {item.exercise?.name ?? "Exercice"}
-      </h2>
-      <p
-        className={`font-semibold ${compact ? "mt-1.5 text-2xl" : "mt-2 text-3xl"}`}
-      >
-        {prescriptionMain(item)}
-      </p>
-      {metaLines.length > 0 ? (
-        <ul
-          className={`mt-2 space-y-1 text-ga-muted ${
-            compact ? "text-sm" : "text-base"
+        <h2
+          className={`min-w-0 flex-1 font-semibold ${
+            compact ? "text-2xl" : "text-3xl"
           }`}
         >
-          {metaLines.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
+          {display?.name ?? item.exercise?.name ?? "Exercice"}
+        </h2>
+        {cues.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setCuesOpen((open) => !open)}
+            className="mt-1 shrink-0 rounded-lg border border-ga-border bg-ga-elevated px-3 py-1.5 text-sm font-medium text-ga-fg hover:border-ga-lime/50"
+          >
+            {cuesOpen ? "Masquer" : "Consignes"}
+          </button>
+        ) : null}
+      </div>
+
+      {levelOptions.length > 1 ? (
+        <label className="mt-3 block text-sm text-ga-muted">
+          Niveau
+          <select
+            value={draft.selectedExerciseId ?? display?.id ?? ""}
+            disabled={disabled}
+            onChange={(event) =>
+              onDraftChange({
+                ...draft,
+                selectedExerciseId: event.target.value || null,
+              })
+            }
+            className="mt-1.5 w-full rounded-xl border border-ga-border bg-ga-elevated px-3 py-2.5 text-sm text-ga-fg outline-none focus:border-ga-lime"
+          >
+            {levelOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {DIFFICULTY_LEVEL_LABELS[
+                  option.difficulty_level as DifficultyLevel
+                ] ?? option.name}
+                {option.name !== display?.name ? ` — ${option.name}` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
       ) : null}
-      {estimatedOneRm != null && !dense ? (
-        <p className={`mt-1.5 text-ga-muted ${compact ? "text-sm" : "text-base"}`}>
-          1RM estimée :{" "}
-          <span className="font-medium text-ga-fg">{estimatedOneRm} kg</span>
-          {percentOneRm != null ? (
-            <>
-              {" · "}
-              <span className="font-medium text-ga-fg">{percentOneRm}%</span> 1RM
-            </>
-          ) : null}
-        </p>
-      ) : null}
-      {item.exercise?.cues && item.exercise.cues.length > 0 && !dense ? (
+
+      {cuesOpen && cues.length > 0 ? (
         <ol
-          className={`mt-4 list-decimal space-y-2 pl-5 text-ga-muted ${
+          className={`mt-3 list-decimal space-y-2 pl-5 text-ga-muted ${
             compact ? "text-sm" : "text-base"
           }`}
         >
-          {item.exercise.cues.slice(0, 6).map((cue) => (
+          {cues.slice(0, 6).map((cue) => (
             <li key={cue}>{cue}</li>
           ))}
         </ol>
       ) : null}
 
+      {/* 1. Séries / tempo / repos — gras blanc */}
+      <ul className={`mt-4 space-y-1 ${compact ? "text-sm" : "text-base"}`}>
+        {followLines.map((line) => (
+          <li key={line.label} className="font-bold text-white">
+            {line.label} : {line.value}
+          </li>
+        ))}
+      </ul>
+
+      {/* 2. Charge / reps / Fait */}
       <div className="mt-6 w-full max-w-full">
         <div className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem] items-center gap-x-2.5 gap-y-1 text-sm text-ga-muted">
           <span>Sér.</span>
@@ -246,6 +278,7 @@ function ExercisePanel({
         </div>
       </div>
 
+      {/* 3. RPE ressenti */}
       <div className="mt-6">
         <p className="text-base text-ga-muted">RPE ressenti</p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -267,6 +300,7 @@ function ExercisePanel({
         </div>
       </div>
 
+      {/* 4. Commentaire */}
       <label className="mt-6 block text-base text-ga-muted">
         Commentaire
         <textarea
@@ -287,13 +321,11 @@ function GroupContent({
   group,
   drafts,
   onDraftChange,
-  dense,
   disabled,
 }: {
   group: WorkoutGroup;
   drafts: Record<string, ExerciseDraft>;
   onDraftChange: (exerciseId: string, draft: ExerciseDraft) => void;
-  dense: boolean;
   disabled: boolean;
 }) {
   if (group.kind === "single") {
@@ -302,7 +334,6 @@ function GroupContent({
         item={group.item}
         draft={drafts[group.item.id]}
         onDraftChange={(draft) => onDraftChange(group.item.id, draft)}
-        dense={dense}
         disabled={disabled}
       />
     );
@@ -317,12 +348,30 @@ function GroupContent({
           draft={drafts[item.id]}
           onDraftChange={(draft) => onDraftChange(item.id, draft)}
           compact
-          dense={dense}
           disabled={disabled}
         />
       ))}
     </div>
   );
+}
+
+function draftPayload(exercises: AthleteExercise[], drafts: Record<string, ExerciseDraft>) {
+  return exercises.map((exercise) => {
+    const draft = drafts[exercise.id];
+    return {
+      sessionExerciseId: exercise.id,
+      sets: draft.sets.map((set) => ({
+        setNumber: set.set_number,
+        weightKg: set.weight_kg,
+        reps: set.reps,
+        completed: set.completed,
+      })),
+      rpe: draft.rpe,
+      rir: draft.rir,
+      comment: draft.comment,
+      selectedExerciseId: draft.selectedExerciseId,
+    };
+  });
 }
 
 export function SessionWorkout({
@@ -347,34 +396,26 @@ export function SessionWorkout({
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [endedAt, setEndedAt] = useState(toDatetimeLocalValue);
   const [finalRpe, setFinalRpe] = useState<number | null>(null);
-  const [dense, setDense] = useState(false);
-
-  useEffect(() => {
-    try {
-      setDense(window.localStorage.getItem(DENSE_STORAGE_KEY) === "1");
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  function toggleDense() {
-    setDense((current) => {
-      const next = !current;
-      try {
-        window.localStorage.setItem(DENSE_STORAGE_KEY, next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  }
 
   const group = groups[index];
   const total = groups.length;
 
+  const completedBlocs = useMemo(() => {
+    return groups.filter((workoutGroup) => {
+      const items = workoutGroupItems(workoutGroup);
+      return items.every((item) => {
+        const draft = drafts[item.id];
+        if (!draft || draft.sets.length === 0) {
+          return isWorkoutGroupComplete({ kind: "single", item });
+        }
+        return draft.sets.every((set) => set.completed);
+      });
+    }).length;
+  }, [groups, drafts]);
+
   if (!group) {
     return (
-      <p className="px-5 pt-10 text-sm text-ga-muted">
+      <p className="px-[10px] pt-10 text-sm text-ga-muted">
         Aucun exercice dans cette séance.
       </p>
     );
@@ -389,22 +430,8 @@ export function SessionWorkout({
     setError(null);
     setAdvancing(true);
     try {
-      const exercises = workoutGroupItems(group);
       await saveWorkoutDrafts(
-        exercises.map((exercise) => {
-          const draft = drafts[exercise.id];
-          return {
-            sessionExerciseId: exercise.id,
-            sets: draft.sets.map((set) => ({
-              setNumber: set.set_number,
-              weightKg: set.weight_kg,
-              reps: set.reps,
-              completed: set.completed,
-            })),
-            rpe: draft.rpe,
-            comment: draft.comment,
-          };
-        }),
+        draftPayload(workoutGroupItems(group), drafts),
       );
       setIndex(target);
     } finally {
@@ -416,22 +443,8 @@ export function SessionWorkout({
     setError(null);
     setAdvancing(true);
     try {
-      const exercises = workoutGroupItems(group);
       const result = await saveWorkoutDrafts(
-        exercises.map((exercise) => {
-          const draft = drafts[exercise.id];
-          return {
-            sessionExerciseId: exercise.id,
-            sets: draft.sets.map((set) => ({
-              setNumber: set.set_number,
-              weightKg: set.weight_kg,
-              reps: set.reps,
-              completed: set.completed,
-            })),
-            rpe: draft.rpe,
-            comment: draft.comment,
-          };
-        }),
+        draftPayload(workoutGroupItems(group), drafts),
       );
 
       if (result.error) {
@@ -473,7 +486,7 @@ export function SessionWorkout({
   if (confirmingEnd) {
     return (
       <>
-        <div className="px-5 pb-36 pt-8">
+        <div className="px-[10px] pb-36 pt-8">
           <p className="text-base text-ga-muted">{session.title}</p>
           <h1 className="mt-2 text-4xl font-semibold tracking-tight">
             Fin de séance
@@ -511,7 +524,7 @@ export function SessionWorkout({
           </div>
           {error ? <p className="mt-4 text-base text-ga-red">{error}</p> : null}
         </div>
-        <FixedBottomBar offsetClass="bottom-20" variant="athlete">
+        <FixedBottomBar offsetClass="bottom-14" variant="athlete">
           <div className="flex gap-2.5">
             <button
               type="button"
@@ -548,27 +561,14 @@ export function SessionWorkout({
       ? "Terminer la séance"
       : `Bloc terminé → Bloc ${index + 2}`;
 
+  const progressRatio = total > 0 ? completedBlocs / total : 0;
+
   return (
     <>
-      <div className="min-w-0 overflow-x-hidden px-5 pb-64 pt-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate text-base text-ga-muted">{session.title}</p>
-            <p className="mt-0.5 text-lg font-medium text-ga-fg">{stepLabel}</p>
-          </div>
-          <button
-            type="button"
-            onClick={toggleDense}
-            aria-pressed={dense}
-            title={dense ? "Texte normal" : "Texte réduit"}
-            className={`shrink-0 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-              dense
-                ? "border-ga-lime bg-ga-lime/15 text-ga-lime"
-                : "border-ga-border bg-ga-elevated text-ga-muted hover:text-ga-fg"
-            }`}
-          >
-            A−
-          </button>
+      <div className="min-w-0 overflow-x-hidden px-[10px] pb-36 pt-5">
+        <div className="min-w-0">
+          <p className="truncate text-base text-ga-muted">{session.title}</p>
+          <p className="mt-0.5 text-lg font-medium text-ga-fg">{stepLabel}</p>
         </div>
 
         <div className="mt-5">
@@ -576,76 +576,85 @@ export function SessionWorkout({
             group={group}
             drafts={drafts}
             onDraftChange={updateDraft}
-            dense={dense}
             disabled={advancing}
           />
         </div>
 
         {error ? <p className="mt-4 text-base text-ga-red">{error}</p> : null}
+
+        <button
+          type="button"
+          disabled={advancing}
+          onClick={goNext}
+          className="mt-8 w-full rounded-xl bg-ga-lime py-4 text-base font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
+        >
+          {nextCta}
+        </button>
       </div>
 
-      <div className="fixed inset-x-0 bottom-20 z-30 border-t border-ga-border bg-ga-panel/95 backdrop-blur-sm">
-        <div className="mx-auto w-full max-w-2xl px-5 py-3.5">
-          <button
-            type="button"
-            disabled={advancing}
-            onClick={goNext}
-            className="w-full rounded-xl bg-ga-lime py-4 text-base font-semibold text-black hover:bg-lime-300 disabled:opacity-60"
-          >
-            {nextCta}
-          </button>
+      <div className="fixed inset-x-0 bottom-14 z-30 border-t border-ga-border bg-ga-panel/95 backdrop-blur-sm">
+        <div className="mx-auto w-full max-w-2xl px-[10px] pt-2">
+          <div className="flex items-center gap-2">
+            <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-ga-elevated">
+              <div
+                className="h-full rounded-full bg-ga-lime/80 transition-[width] duration-300"
+                style={{ width: `${Math.round(progressRatio * 100)}%` }}
+              />
+            </div>
+            <span className="shrink-0 text-[11px] text-ga-muted">
+              {completedBlocs}/{total}
+            </span>
+          </div>
         </div>
-        <div className="border-t border-ga-border">
-          <div className="mx-auto flex w-full max-w-2xl gap-1.5 overflow-x-auto px-2 py-2.5">
-            {groups.map((workoutGroup, groupIndex) => {
-              const items = workoutGroupItems(workoutGroup);
-              const names = items
-                .map((item) => item.exercise?.name ?? "Exo")
-                .join(" · ");
-              const done = items.every((item) => {
-                const draft = drafts[item.id];
-                if (!draft || draft.sets.length === 0) {
-                  return isWorkoutGroupComplete({
-                    kind: "single",
-                    item,
-                  });
+        <div className="mx-auto flex w-full max-w-2xl gap-1.5 overflow-x-auto px-2 py-2.5">
+          {groups.map((workoutGroup, groupIndex) => {
+            const items = workoutGroupItems(workoutGroup);
+            const names = items
+              .map((item) => item.exercise?.name ?? "Exo")
+              .join(" · ");
+            const done = items.every((item) => {
+              const draft = drafts[item.id];
+              if (!draft || draft.sets.length === 0) {
+                return isWorkoutGroupComplete({
+                  kind: "single",
+                  item,
+                });
+              }
+              return draft.sets.every((set) => set.completed);
+            });
+            const active = groupIndex === index;
+            return (
+              <button
+                key={
+                  workoutGroup.kind === "single"
+                    ? workoutGroup.item.id
+                    : workoutGroup.items.map((item) => item.id).join("-")
                 }
-                return draft.sets.every((set) => set.completed);
-              });
-              const active = groupIndex === index;
-              return (
-                <button
-                  key={
-                    workoutGroup.kind === "single"
-                      ? workoutGroup.item.id
-                      : workoutGroup.items.map((item) => item.id).join("-")
-                  }
-                  type="button"
-                  disabled={advancing}
-                  onClick={() => jumpToBloc(groupIndex)}
-                  className={`min-w-[5.25rem] flex-1 rounded-xl px-2 py-2 text-center transition disabled:opacity-60 ${
-                    active
-                      ? "bg-ga-lime text-black"
-                      : done
-                        ? "bg-ga-lime/15 text-ga-lime"
-                        : "bg-ga-elevated text-ga-muted"
+                type="button"
+                disabled={advancing}
+                onClick={() => jumpToBloc(groupIndex)}
+                className={`min-w-[5.25rem] flex-1 rounded-xl px-2 py-2 text-center transition disabled:opacity-60 ${
+                  active
+                    ? "bg-ga-lime text-black"
+                    : done
+                      ? "bg-ga-lime/15 text-ga-lime"
+                      : "bg-ga-elevated text-ga-muted"
+                }`}
+              >
+                <span className="block text-xs font-semibold leading-tight">
+                  Bloc {groupIndex + 1}
+                  {done && !active ? " ✓" : ""}
+                </span>
+                <span
+                  className={`mt-1 block truncate text-[11px] leading-tight ${
+                    active ? "text-black/70" : "opacity-80"
                   }`}
                 >
-                  <span className="block text-xs font-semibold leading-tight">
-                    Bloc {groupIndex + 1}
-                    {done && !active ? " ✓" : ""}
-                  </span>
-                  <span
-                    className={`mt-1 block truncate text-[11px] leading-tight ${
-                      active ? "text-black/70" : "opacity-80"
-                    }`}
-                  >
-                    {names}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                  {names}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </>

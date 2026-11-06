@@ -33,7 +33,7 @@ export function PreviousWeekPerfPanel({
   if (!open) return null;
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-l border-ga-border bg-ga-panel xl:w-96">
+    <aside className="flex w-64 shrink-0 flex-col border-l border-ga-border bg-ga-panel xl:w-72">
       <div className="flex items-center justify-between gap-2 border-b border-ga-border px-4 py-3">
         <div>
           <p className="text-sm font-semibold">
@@ -119,6 +119,23 @@ export function PreviousWeekPerfPanel({
                               Pas de saisie
                             </p>
                           )}
+                          {exercise.rpe != null ||
+                          exercise.rir != null ||
+                          exercise.comment ? (
+                            <p className="mt-1.5 text-[11px] text-ga-muted">
+                              {[
+                                exercise.rpe != null
+                                  ? `RPE ${exercise.rpe}`
+                                  : null,
+                                exercise.rir != null
+                                  ? `RIR ${exercise.rir}`
+                                  : null,
+                                exercise.comment,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                          ) : null}
                         </li>
                       );
                     })}

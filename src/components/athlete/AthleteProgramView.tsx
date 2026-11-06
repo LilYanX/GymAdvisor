@@ -17,6 +17,7 @@ import { formatPrescriptionQuantity, weekdayLabel } from "@/lib/labels";
 import { formatDayMonth } from "@/lib/dates";
 import { FixedBottomBar } from "@/components/layout/FixedBottomBar";
 import { ExercisePreviewSheet } from "@/components/athlete/ExercisePreviewSheet";
+import { SkipSessionButton } from "@/components/athlete/SkipSessionButton";
 import { IconPlay } from "@/components/icons";
 
 function isTrackable(day: AthleteDay): boolean {
@@ -82,12 +83,12 @@ export function AthleteProgramView({ data }: { data: AthleteProgram }) {
   if (trackable.length === 0) {
     return (
       <div className="px-5 pb-8 pt-8">
-        <h1 className="text-5xl font-semibold tracking-tight">Programme</h1>
-        <p className="mt-2.5 text-lg text-ga-muted">
+        <h1 className="text-3xl font-semibold tracking-tight">Programme</h1>
+        <p className="mt-1.5 text-sm text-ga-muted">
           Semaine {data.week?.week_number ?? data.athlete.current_week} /{" "}
           {data.athlete.total_weeks}
         </p>
-        <p className="mt-8 text-lg text-ga-muted">
+        <p className="mt-8 text-sm text-ga-muted">
           Aucune séance programmée cette semaine.
         </p>
       </div>
@@ -96,9 +97,9 @@ export function AthleteProgramView({ data }: { data: AthleteProgram }) {
 
   return (
     <>
-      <div className="px-5 pb-44 pt-8">
-        <h1 className="text-5xl font-semibold tracking-tight">Programme</h1>
-        <p className="mt-2.5 text-lg text-ga-muted">
+      <div className="px-5 pb-52 pt-8">
+        <h1 className="text-3xl font-semibold tracking-tight">Programme</h1>
+        <p className="mt-1.5 text-sm text-ga-muted">
           Semaine {data.week?.week_number ?? data.athlete.current_week} /{" "}
           {data.athlete.total_weeks} · {trackable.length} séance
           {trackable.length > 1 ? "s" : ""}
@@ -127,7 +128,7 @@ export function AthleteProgramView({ data }: { data: AthleteProgram }) {
         {selected ? (
           <section className="mt-7">
             <div className="flex items-start justify-between gap-3">
-              <h2 className="text-3xl font-semibold leading-tight">
+              <h2 className="text-2xl font-semibold leading-tight">
                 {selected.session.title}
               </h2>
               <p className="shrink-0 pt-1.5 text-base text-ga-muted">
@@ -154,13 +155,18 @@ export function AthleteProgramView({ data }: { data: AthleteProgram }) {
       </div>
 
       {selected ? (
-        <FixedBottomBar offsetClass="bottom-20" variant="athlete">
-          <Link
-            href={`/app/seance/${selected.session.id}`}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-ga-lime py-4 text-lg font-semibold text-black hover:bg-lime-300"
-          >
-            ▶ {ctaLabel(selected)}
-          </Link>
+        <FixedBottomBar offsetClass="bottom-14" variant="athlete">
+          <div className="flex w-full flex-col gap-2">
+            <Link
+              href={`/app/seance/${selected.session.id}`}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-ga-lime py-4 text-lg font-semibold text-black hover:bg-lime-300"
+            >
+              ▶ {ctaLabel(selected)}
+            </Link>
+            {selected.kind !== "completed" ? (
+              <SkipSessionButton sessionId={selected.session.id} />
+            ) : null}
+          </div>
         </FixedBottomBar>
       ) : null}
 

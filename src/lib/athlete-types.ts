@@ -14,6 +14,8 @@ export type AthleteExercise = SessionExercise & {
   exercise: Exercise | null;
   log: SessionExerciseLog | null;
   sets: SetLog[];
+  /** Variantes du même groupe (niveaux), si renseigné. */
+  variantOptions: Exercise[];
 };
 
 export type AthleteSessionView = Session & {
@@ -29,7 +31,9 @@ export type AthleteDay = {
 };
 
 export type AthleteCalendarMarker = {
+  /** Activités libres + séances complétées/skipped (pastille verte). */
   activityCount: number;
+  /** Séance programmée non terminée (pastille bleue). */
   hasPlannedSession: boolean;
 };
 

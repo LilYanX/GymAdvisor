@@ -21,7 +21,25 @@ const GROUPS: MuscleGroup[] = [
   "balistique",
   "pliometrie",
   "etirement",
+  "objectif",
 ];
+
+const DIFFICULTY_LEVELS = ["basique", "intermediaire", "avance"] as const;
+
+function parseDifficultyLevel(
+  raw: string,
+): "basique" | "intermediaire" | "avance" | null {
+  if (!raw) return null;
+  return (DIFFICULTY_LEVELS as readonly string[]).includes(raw)
+    ? (raw as "basique" | "intermediaire" | "avance")
+    : null;
+}
+
+function parseVariantGroupId(raw: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
+  return value;
+}
 
 export async function createExercise(
   _prev: ExerciseFormState,
@@ -40,6 +58,12 @@ export async function createExercise(
   const vigilancePoints = String(formData.get("vigilance_points") ?? "").trim();
   const oneRmFormulaRaw = String(formData.get("one_rm_formula") ?? "").trim();
   const oneRmFormula = oneRmFormulaRaw || null;
+  const difficultyLevel = parseDifficultyLevel(
+    String(formData.get("difficulty_level") ?? ""),
+  );
+  const variantGroupId = parseVariantGroupId(
+    String(formData.get("variant_group_id") ?? ""),
+  );
 
   if (!name) {
     return { error: "Le nom de l’exercice est obligatoire." };
@@ -60,6 +84,8 @@ export async function createExercise(
     cues,
     vigilance_points: vigilancePoints,
     one_rm_formula: oneRmFormula,
+    difficulty_level: difficultyLevel,
+    variant_group_id: variantGroupId,
   });
 
   if (error) {
@@ -114,6 +140,12 @@ export async function updateExercise(
   const vigilancePoints = String(formData.get("vigilance_points") ?? "").trim();
   const oneRmFormulaRaw = String(formData.get("one_rm_formula") ?? "").trim();
   const oneRmFormula = oneRmFormulaRaw || null;
+  const difficultyLevel = parseDifficultyLevel(
+    String(formData.get("difficulty_level") ?? ""),
+  );
+  const variantGroupId = parseVariantGroupId(
+    String(formData.get("variant_group_id") ?? ""),
+  );
 
   if (!exerciseId) return { error: "Exercice introuvable." };
   if (!name) return { error: "Le nom de l’exercice est obligatoire." };
@@ -134,6 +166,8 @@ export async function updateExercise(
       cues,
       vigilance_points: vigilancePoints,
       one_rm_formula: oneRmFormula,
+      difficulty_level: difficultyLevel,
+      variant_group_id: variantGroupId,
     })
     .eq("id", exerciseId);
 

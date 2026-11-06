@@ -127,6 +127,8 @@ export type Database = {
           cues: string[];
           vigilance_points: string;
           one_rm_formula: string | null;
+          difficulty_level: "basique" | "intermediaire" | "avance" | null;
+          variant_group_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -139,6 +141,8 @@ export type Database = {
           cues?: string[];
           vigilance_points?: string;
           one_rm_formula?: string | null;
+          difficulty_level?: "basique" | "intermediaire" | "avance" | null;
+          variant_group_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -151,6 +155,8 @@ export type Database = {
           cues?: string[];
           vigilance_points?: string;
           one_rm_formula?: string | null;
+          difficulty_level?: "basique" | "intermediaire" | "avance" | null;
+          variant_group_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -387,7 +393,9 @@ export type Database = {
           session_exercise_id: string;
           athlete_id: string;
           rpe: number | null;
+          rir: number | null;
           comment: string;
+          selected_exercise_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -396,7 +404,9 @@ export type Database = {
           session_exercise_id: string;
           athlete_id: string;
           rpe?: number | null;
+          rir?: number | null;
           comment?: string;
+          selected_exercise_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -405,7 +415,9 @@ export type Database = {
           session_exercise_id?: string;
           athlete_id?: string;
           rpe?: number | null;
+          rir?: number | null;
           comment?: string;
+          selected_exercise_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -934,7 +946,8 @@ export type Database = {
         | "mobilite"
         | "balistique"
         | "pliometrie"
-        | "etirement";
+        | "etirement"
+        | "objectif";
       week_status: "draft" | "published";
       session_type: "workout" | "rest" | "optional";
       session_log_status: "not_started" | "in_progress" | "completed" | "skipped";

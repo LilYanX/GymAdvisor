@@ -11,6 +11,7 @@ import {
 import { formatPrescriptionQuantity, weekdayLabel } from "@/lib/labels";
 import { FixedBottomBar } from "@/components/layout/FixedBottomBar";
 import { ExercisePreviewSheet } from "@/components/athlete/ExercisePreviewSheet";
+import { SkipSessionButton } from "@/components/athlete/SkipSessionButton";
 import { IconPlay } from "@/components/icons";
 
 function prescriptionMain(item: AthleteExercise): string {
@@ -171,13 +172,19 @@ export function AthleteSessionOverview({
         )}
       </div>
 
-      <FixedBottomBar offsetClass="bottom-20" variant="athlete">
-        <Link
-          href={`/app/seance/${session.id}`}
-          className="flex w-full items-center justify-center rounded-xl bg-ga-lime py-3 text-sm font-semibold text-black hover:bg-lime-300"
-        >
-          {ctaLabel}
-        </Link>
+      <FixedBottomBar offsetClass="bottom-14" variant="athlete">
+        <div className="flex w-full flex-col gap-2">
+          <Link
+            href={`/app/seance/${session.id}`}
+            className="flex w-full items-center justify-center rounded-xl bg-ga-lime py-3 text-sm font-semibold text-black hover:bg-lime-300"
+          >
+            {ctaLabel}
+          </Link>
+          {session.log?.status !== "completed" &&
+          session.log?.status !== "skipped" ? (
+            <SkipSessionButton sessionId={session.id} />
+          ) : null}
+        </div>
       </FixedBottomBar>
 
       <ExercisePreviewSheet

@@ -446,6 +446,12 @@ export async function updateSessionExercise(
 ) {
   await requireCoach();
   const supabase = await createClient();
+  if (
+    patch.sets_count !== undefined &&
+    (!Number.isFinite(patch.sets_count) || patch.sets_count < 1)
+  ) {
+    return { error: "Le nombre de séries doit être au moins 1." };
+  }
   const sanitized = {
     ...patch,
     rest_seconds:

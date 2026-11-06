@@ -201,7 +201,7 @@ export function SubProgramEditor({
               .
             </p>
           ) : (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2">
               {filtered.map((exercise) => (
                 <button
                   key={exercise.id}
@@ -338,20 +338,25 @@ export function SubProgramEditor({
                         Séries
                         <input
                           type="number"
+                          min={1}
                           value={item.sets_count}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            const raw = event.target.value.trim();
+                            if (raw === "") return;
+                            const n = Number(raw);
+                            if (!Number.isFinite(n) || n < 1) return;
                             setDraft((current) => ({
                               ...current,
                               exercises: current.exercises.map((exercise) =>
                                 exercise.id === item.id
                                   ? {
                                       ...exercise,
-                                      sets_count: Number(event.target.value) || 1,
+                                      sets_count: Math.round(n),
                                     }
                                   : exercise,
                               ),
-                            }))
-                          }
+                            }));
+                          }}
                           className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1 text-sm"
                         />
                       </label>
@@ -433,6 +438,23 @@ export function SubProgramEditor({
                           />
                         </label>
                       ) : null}
+                      <label className="col-span-2 text-xs text-ga-muted sm:col-span-3">
+                        Tempo
+                        <input
+                          value={item.tempo ?? ""}
+                          onChange={(event) =>
+                            setDraft((current) => ({
+                              ...current,
+                              exercises: current.exercises.map((exercise) =>
+                                exercise.id === item.id
+                                  ? { ...exercise, tempo: event.target.value }
+                                  : exercise,
+                              ),
+                            }))
+                          }
+                          className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1 text-sm"
+                        />
+                      </label>
                       <label className="text-xs text-ga-muted">
                         Repos (s)
                         <input
@@ -456,23 +478,6 @@ export function SubProgramEditor({
                               ),
                             }));
                           }}
-                          className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1 text-sm"
-                        />
-                      </label>
-                      <label className="col-span-2 text-xs text-ga-muted sm:col-span-3">
-                        Tempo
-                        <input
-                          value={item.tempo ?? ""}
-                          onChange={(event) =>
-                            setDraft((current) => ({
-                              ...current,
-                              exercises: current.exercises.map((exercise) =>
-                                exercise.id === item.id
-                                  ? { ...exercise, tempo: event.target.value }
-                                  : exercise,
-                              ),
-                            }))
-                          }
                           className="mt-1 w-full rounded-md border border-ga-border bg-ga-card px-2 py-1 text-sm"
                         />
                       </label>
