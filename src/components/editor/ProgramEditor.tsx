@@ -12,6 +12,7 @@ import {
   insertTemplateIntoSessionLocal,
   linkSupersetWithPreviousLocal,
   moveSessionExerciseLocal,
+  moveSupersetLocal,
   removeSessionExerciseLocal,
   serializeWeekForSync,
   unlinkFromSupersetLocal,
@@ -77,6 +78,7 @@ function groupExercises(items: EditorSessionExercise[]): ExerciseGroup[] {
 
 const LIBRARY_DRAG = "application/x-gymadvisor-library-exercise";
 const SESSION_DRAG = "application/x-gymadvisor-session-exercise";
+const SESSION_SUPERSET_DRAG = "application/x-gymadvisor-session-superset";
 
 type DropTarget = {
   sessionId: string;
@@ -318,6 +320,7 @@ export function ProgramEditor({
     setDropTarget(null);
 
     const libraryExerciseId = event.dataTransfer.getData(LIBRARY_DRAG);
+    const sessionSupersetId = event.dataTransfer.getData(SESSION_SUPERSET_DRAG);
     const sessionExerciseId = event.dataTransfer.getData(SESSION_DRAG);
 
     if (libraryExerciseId) {
@@ -329,6 +332,19 @@ export function ProgramEditor({
           currentWeek,
           sessionId,
           exercise,
+          beforeExerciseId,
+        ),
+      );
+      return;
+    }
+    if (sessionSupersetId) {
+      const currentWeek = draftWeek ?? week;
+      if (!currentWeek) return;
+      applyWeek(
+        moveSupersetLocal(
+          currentWeek,
+          sessionSupersetId,
+          sessionId,
           beforeExerciseId,
         ),
       );
@@ -781,7 +797,26 @@ export function ProgramEditor({
                         <div
                           className="rounded-lg border border-ga-blue/40 bg-ga-blue/5 p-2"
                         >
-                          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-ga-blue">
+                          <p
+                            draggable={!publishing}
+                            title="Glisser pour déplacer tout le superset"
+                            onDragStart={(event) => {
+                              event.dataTransfer.setData(
+                                SESSION_SUPERSET_DRAG,
+                                group.items[0].id,
+                              );
+                              event.dataTransfer.effectAllowed = "move";
+                            }}
+                            onDragEnd={() => {
+                              setDragOverSessionId(null);
+                              setDropTarget(null);
+                            }}
+                            className={`mb-2 text-[10px] font-semibold uppercase tracking-wide text-ga-blue ${
+                              publishing
+                                ? ""
+                                : "cursor-grab active:cursor-grabbing"
+                            }`}
+                          >
                             Superset · {group.items.length} exercices
                           </p>
                           <div className="flex flex-col gap-2">

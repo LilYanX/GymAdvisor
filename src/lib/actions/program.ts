@@ -610,6 +610,10 @@ export async function syncWeekDraft(weekId: string, payload: WeekSyncPayload) {
   const groupIdMap = new Map<string, string>();
   const tempOffset = 100_000;
 
+  // Phase 1 : écrire tous les exercices (y compris déplacements inter-jours)
+  // avec des sort_order temporaires, AVANT tout renumérotage.
+  // Sinon, un exo encore sur l’ancien jour avec sort_order 0/1/… entre en
+  // conflit avec le renumérotage du jour source.
   for (const session of payload.sessions) {
     const realSessionId = sessionIdMap.get(session.id);
     if (!realSessionId) continue;
@@ -654,6 +658,12 @@ export async function syncWeekDraft(weekId: string, payload: WeekSyncPayload) {
         if (error) return { error: error.message };
       }
     }
+  }
+
+  // Phase 2 : renuméroter 0…n une fois tous les déplacements appliqués.
+  for (const session of payload.sessions) {
+    const realSessionId = sessionIdMap.get(session.id);
+    if (!realSessionId) continue;
 
     const orderedIds = (
       await supabase
@@ -662,6 +672,14 @@ export async function syncWeekDraft(weekId: string, payload: WeekSyncPayload) {
         .eq("session_id", realSessionId)
         .order("sort_order")
     ).data?.map((row) => row.id) ?? [];
+
+    for (let index = 0; index < orderedIds.length; index += 1) {
+      const { error } = await supabase
+        .from("session_exercises")
+        .update({ sort_order: tempOffset + 10_000 + index })
+        .eq("id", orderedIds[index]);
+      if (error) return { error: error.message };
+    }
 
     for (let index = 0; index < orderedIds.length; index += 1) {
       const { error } = await supabase

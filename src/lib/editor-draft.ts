@@ -257,6 +257,67 @@ export function moveSessionExerciseLocal(
   });
 }
 
+/** Déplace tous les exercices d’un même superset, en conservant l’ordre et le groupe. */
+export function moveSupersetLocal(
+  week: EditorWeek,
+  memberExerciseId: string,
+  targetSessionId: string,
+  beforeExerciseId: string | null = null,
+): EditorWeek {
+  const located = findExercise(week, memberExerciseId);
+  if (!located) return week;
+
+  const groupId = located.exercise.superset_group_id;
+  if (!groupId) {
+    return moveSessionExerciseLocal(
+      week,
+      memberExerciseId,
+      targetSessionId,
+      beforeExerciseId,
+    );
+  }
+
+  const members = located.session.session_exercises.filter(
+    (exercise) => exercise.superset_group_id === groupId,
+  );
+  if (members.length === 0) return week;
+
+  const memberIds = new Set(members.map((item) => item.id));
+  if (
+    located.session.id === targetSessionId &&
+    beforeExerciseId != null &&
+    memberIds.has(beforeExerciseId)
+  ) {
+    return week;
+  }
+
+  const moving = members.map((item) => ({
+    ...item,
+    session_id: targetSessionId,
+  }));
+
+  const without = updateSession(week, located.session.id, (session) => ({
+    ...session,
+    session_exercises: normalizeSessionExercises(
+      session.session_exercises.filter((exercise) => !memberIds.has(exercise.id)),
+    ),
+  }));
+
+  return updateSession(without, targetSessionId, (session) => {
+    const exercises = [...session.session_exercises];
+    let insertIndex = exercises.length;
+    if (beforeExerciseId && !memberIds.has(beforeExerciseId)) {
+      const index = exercises.findIndex((item) => item.id === beforeExerciseId);
+      if (index >= 0) insertIndex = index;
+    }
+    exercises.splice(insertIndex, 0, ...moving);
+    return {
+      ...session,
+      session_exercises: normalizeSessionExercises(exercises),
+    };
+  });
+}
+
 export function linkSupersetWithPreviousLocal(
   week: EditorWeek,
   sessionExerciseId: string,
